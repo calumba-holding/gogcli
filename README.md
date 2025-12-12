@@ -122,6 +122,6 @@ For clean stdout when scripting:
 
 This project is inspired by Mario Zechner’s original CLIs:
 
-- `https://github.com/badlogic/gmcli`
-- `https://github.com/badlogic/gccli`
-- `https://github.com/badlogic/gdcli`
+- [`gmcli`](https://github.com/badlogic/gmcli)
+- [`gccli`](https://github.com/badlogic/gccli)
+- [`gdcli`](https://github.com/badlogic/gdcli)
