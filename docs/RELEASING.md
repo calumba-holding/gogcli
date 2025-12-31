@@ -8,6 +8,12 @@ This playbook mirrors the Homebrew + GitHub flow used in `../camsnap`.
 
 Always do **all** steps below (CI + changelog + tag + GitHub release artifacts + tap update + Homebrew sanity install). No partial releases.
 
+Shortcut scripts (preferred, keep notes non-empty):
+```sh
+scripts/release.sh X.Y.Z
+scripts/verify-release.sh X.Y.Z
+```
+
 Assumptions:
 - Repo: `steipete/gogcli`
 - Tap repo: `../homebrew-tap` (tap: `steipete/tap`)
@@ -54,6 +60,8 @@ The tag push triggers `.github/workflows/release.yml` (GoReleaser). Ensure it co
 gh run list -L 5 --workflow release.yml
 gh release view vX.Y.Z
 ```
+
+Ensure GitHub release notes are not empty (mirror the changelog section).
 
 If the workflow needs a rerun:
 ```sh
