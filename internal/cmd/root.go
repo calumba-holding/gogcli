@@ -49,6 +49,7 @@ type exitPanic struct{ code int }
 
 func Execute(args []string) (err error) {
 	envMode := outfmt.FromEnv()
+	expandHelp := os.Getenv("GOG_HELP") == "full" || os.Getenv("GOG_HELP_EXPAND") == "1"
 	vars := kong.Vars{
 		"color":   envOr("GOG_COLOR", "auto"),
 		"json":    boolString(envMode.JSON),
@@ -62,6 +63,10 @@ func Execute(args []string) (err error) {
 		kong.Name("gog"),
 		kong.Description(helpDescription()),
 		kong.Vars(vars),
+		kong.ConfigureHelp(kong.HelpOptions{
+			NoExpandSubcommands: !expandHelp,
+		}),
+		kong.Help(helpPrinter),
 		kong.Writers(os.Stdout, os.Stderr),
 		kong.Exit(func(code int) { panic(exitPanic{code: code}) }),
 	)

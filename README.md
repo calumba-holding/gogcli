@@ -39,6 +39,15 @@ Run:
 ./bin/gog --help
 ```
 
+Help:
+
+- `gog --help` shows top-level command groups.
+- Drill down with `gog <group> --help` (and deeper subcommands).
+- For the full expanded command list: `GOG_HELP=full gog --help`.
+- Make shortcut: `make gogcli -- --help` (or `make gogcli -- gmail --help`).
+- `make gogcli-help` shows CLI help (note: `make gogcli --help` is Make’s own help).
+- Gmail settings: `gog gmail settings --help` (old paths like `gog gmail watch ...` still work).
+
 ## Quick Start
 
 ### 1. Get OAuth2 Credentials
