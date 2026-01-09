@@ -254,6 +254,7 @@ func TestAuthTokensImport_NoInput(t *testing.T) {
 	origKeychain := ensureKeychainAccess
 	t.Cleanup(func() { ensureKeychainAccess = origKeychain })
 
+	t.Setenv("GOG_KEYRING_BACKEND", "keychain")
 	ensureKeychainAccess = func() error {
 		return errors.New("keychain locked")
 	}
@@ -269,6 +270,36 @@ func TestAuthTokensImport_NoInput(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "keychain access") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAuthTokensImport_FileBackendSkipsKeychain(t *testing.T) {
+	origOpen := openSecretsStore
+	origKeychain := ensureKeychainAccess
+	t.Cleanup(func() {
+		openSecretsStore = origOpen
+		ensureKeychainAccess = origKeychain
+	})
+
+	t.Setenv("GOG_KEYRING_BACKEND", "file")
+	ensureKeychainAccess = func() error {
+		return errors.New("keychain locked")
+	}
+
+	store := newMemSecretsStore()
+	openSecretsStore = func() (secrets.Store, error) { return store, nil }
+
+	outPath := filepath.Join(t.TempDir(), "token.json")
+	if err := os.WriteFile(outPath, []byte(`{"email":"a@b.com","refresh_token":"rt"}`), 0o600); err != nil {
+		t.Fatalf("write token file: %v", err)
+	}
+
+	if err := Execute([]string{"--json", "auth", "tokens", "import", outPath}); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	if _, err := store.GetToken("a@b.com"); err != nil {
+		t.Fatalf("expected token stored: %v", err)
 	}
 }
 

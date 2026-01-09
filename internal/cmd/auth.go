@@ -26,6 +26,17 @@ var (
 	ensureKeychainAccess = secrets.EnsureKeychainAccess
 )
 
+func ensureKeychainAccessIfNeeded() error {
+	backendInfo, err := secrets.ResolveKeyringBackendInfo()
+	if err != nil {
+		return fmt.Errorf("resolve keyring backend: %w", err)
+	}
+	if backendInfo.Value == "file" {
+		return nil
+	}
+	return ensureKeychainAccess()
+}
+
 type AuthCmd struct {
 	Credentials AuthCredentialsCmd `cmd:"" name:"credentials" help:"Store OAuth client credentials"`
 	Add         AuthAddCmd         `cmd:"" name:"add" help:"Authorize and store a refresh token"`
@@ -270,7 +281,7 @@ func (c *AuthTokensImportCmd) Run(ctx context.Context) error {
 	}
 
 	// Pre-flight: ensure keychain is accessible before storing token
-	if keychainErr := ensureKeychainAccess(); keychainErr != nil {
+	if keychainErr := ensureKeychainAccessIfNeeded(); keychainErr != nil {
 		return fmt.Errorf("keychain access: %w", keychainErr)
 	}
 
@@ -325,7 +336,7 @@ func (c *AuthAddCmd) Run(ctx context.Context) error {
 	}
 
 	// Pre-flight: ensure keychain is accessible before starting OAuth
-	if keychainErr := ensureKeychainAccess(); keychainErr != nil {
+	if keychainErr := ensureKeychainAccessIfNeeded(); keychainErr != nil {
 		return fmt.Errorf("keychain access: %w", keychainErr)
 	}
 

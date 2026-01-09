@@ -586,6 +586,73 @@ func TestManageServer_HandleOAuthCallback_Success(t *testing.T) {
 	}
 }
 
+func TestManageServer_HandleOAuthCallback_FileBackendSkipsKeychain(t *testing.T) {
+	origRead := readClientCredentials
+	origEndpoint := oauthEndpoint
+	origResolve := resolveKeyringBackendInfo
+	origEnsure := ensureKeychainAccess
+
+	t.Cleanup(func() {
+		readClientCredentials = origRead
+		oauthEndpoint = origEndpoint
+		resolveKeyringBackendInfo = origResolve
+		ensureKeychainAccess = origEnsure
+	})
+
+	resolveKeyringBackendInfo = func() (secrets.KeyringBackendInfo, error) {
+		return secrets.KeyringBackendInfo{Value: "file", Source: "env"}, nil
+	}
+	ensureKeychainAccess = func() error {
+		return errors.New("should not call")
+	}
+
+	readClientCredentials = func() (config.ClientCredentials, error) {
+		return config.ClientCredentials{ClientID: "id", ClientSecret: "secret"}, nil
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "token",
+			"refresh_token": "refresh",
+			"token_type":    "Bearer",
+			"expires_in":    3600,
+		})
+	}))
+	defer srv.Close()
+
+	oauthEndpoint = oauth2.Endpoint{AuthURL: "http://example.com/auth", TokenURL: srv.URL}
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+
+	store := &fakeStore{}
+	ms := &ManageServer{
+		oauthState: "state1",
+		listener:   ln,
+		store:      store,
+		fetchEmail: func(ctx context.Context, tok *oauth2.Token) (string, error) {
+			return "me@example.com", nil
+		},
+		opts: ManageServerOptions{Services: []Service{ServiceGmail}},
+	}
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/oauth2/callback?state=state1&code=abc", nil)
+	ms.handleOAuthCallback(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status: %d body: %s", rr.Code, rr.Body.String())
+	}
+
+	if store.setTokenEmail != "me@example.com" {
+		t.Fatalf("expected token stored for me@example.com, got %q", store.setTokenEmail)
+	}
+}
+
 func TestManageServer_HandleOAuthCallback_Success_IDTokenEmail(t *testing.T) {
 	origRead := readClientCredentials
 	origEndpoint := oauthEndpoint

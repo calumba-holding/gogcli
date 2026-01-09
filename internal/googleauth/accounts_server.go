@@ -48,7 +48,11 @@ type ManageServer struct {
 	resultCh   chan error
 }
 
-var openDefaultStore = secrets.OpenDefault
+var (
+	openDefaultStore          = secrets.OpenDefault
+	resolveKeyringBackendInfo = secrets.ResolveKeyringBackendInfo
+	ensureKeychainAccess      = secrets.EnsureKeychainAccess
+)
 
 var (
 	errUserinfoRequestFailed = errors.New("userinfo request failed")
@@ -60,6 +64,14 @@ var (
 )
 
 const userinfoURL = "https://www.googleapis.com/oauth2/v2/userinfo"
+
+func shouldEnsureKeychainAccess() (bool, error) {
+	backendInfo, err := resolveKeyringBackendInfo()
+	if err != nil {
+		return false, err
+	}
+	return backendInfo.Value != "file", nil
+}
 
 // StartManageServer starts the accounts management server and opens browser
 func StartManageServer(ctx context.Context, opts ManageServerOptions) error {
@@ -324,11 +336,20 @@ func (ms *ManageServer) handleOAuthCallback(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Pre-flight: ensure keychain is accessible before storing token
-	if err := secrets.EnsureKeychainAccess(); err != nil { //nolint:contextcheck,nolintlint // keychain ops don't use context; nolint unused on non-Darwin
+	needKeychain, err := shouldEnsureKeychainAccess()
+	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		renderErrorPage(w, "Keychain is locked: "+err.Error())
+		renderErrorPage(w, "Failed to resolve keyring backend: "+err.Error())
 
 		return
+	}
+	if needKeychain {
+		if err := ensureKeychainAccess(); err != nil { //nolint:contextcheck,nolintlint // keychain ops don't use context; nolint unused on non-Darwin
+			w.WriteHeader(http.StatusInternalServerError)
+			renderErrorPage(w, "Keychain is locked: "+err.Error())
+
+			return
+		}
 	}
 
 	// Store the token
