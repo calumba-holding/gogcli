@@ -6,6 +6,10 @@
 
 - Gmail: `--body-file` for `send`, `drafts create`, and `drafts update` (use `-` for stdin) to send multi-line plain text.
 
+### Changed
+
+- Tasks: `gog tasks list` now defaults to `--show-assigned`. (#59) — thanks @tompson.
+
 ## 0.6.0 - 2026-01-11
 
 ### Added
