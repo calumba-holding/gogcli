@@ -204,7 +204,7 @@ type GmailWatchServeCmd struct {
 	HookToken     string `name:"hook-token" help:"Webhook bearer token"`
 	IncludeBody   bool   `name:"include-body" help:"Include text/plain body in hook payload"`
 	MaxBytes      int    `name:"max-bytes" help:"Max bytes of body to include" default:"20000"`
-	ExcludeLabels string `name:"exclude-labels" help:"Comma-separated list of Gmail label IDs to exclude from hook payload (e.g. SPAM,TRASH). Set to empty string to disable." default:"SPAM,TRASH"`
+	ExcludeLabels string `name:"exclude-labels" help:"List of Gmail label IDs to exclude from hook payload (e.g. SPAM,TRASH,Label_123). Set to empty string to disable." default:"SPAM,TRASH"`
 	SaveHook      bool   `name:"save-hook" help:"Persist hook settings to watch state"`
 }
 
