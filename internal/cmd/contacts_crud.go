@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	contactsReadMask    = "names,emailAddresses,phoneNumbers,organizations,urls"
-	contactsGetReadMask = contactsReadMask + ",birthdays,biographies,addresses,userDefined,metadata"
+	contactsReadMask       = "names,emailAddresses,phoneNumbers,organizations,urls"
+	contactsGetReadMask    = contactsReadMask + ",birthdays,biographies,addresses,userDefined,metadata"
+	contactsUpdateReadMask = contactsReadMask + ",birthdays,biographies,userDefined,metadata"
 )
 
 type ContactsListCmd struct {
@@ -205,29 +206,81 @@ type ContactsCreateCmd struct {
 	Custom       []string `name:"custom" help:"Custom field as key=value (can be repeated)"`
 }
 
-func parseCustomUserDefined(values []string, allowEmptyClear bool) ([]*people.UserDefined, error) {
+func parseCustomUserDefined(values []string, allowEmptyClear bool) ([]*people.UserDefined, bool, error) {
 	if len(values) == 0 {
-		return nil, nil
+		return nil, false, nil
 	}
 	if len(values) == 1 && strings.TrimSpace(values[0]) == "" {
-		if allowEmptyClear {
-			return nil, nil
+		if !allowEmptyClear {
+			return nil, false, fmt.Errorf("--custom entry cannot be empty")
 		}
-		return nil, fmt.Errorf("--custom entry cannot be empty")
+		return nil, true, nil
 	}
 
 	userDefined := make([]*people.UserDefined, 0, len(values))
 	for _, kv := range values {
 		parts := strings.SplitN(strings.TrimSpace(kv), "=", 2)
 		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
-			return nil, fmt.Errorf("expected key=value for --custom, got %q", kv)
+			return nil, false, fmt.Errorf("expected key=value for --custom, got %q", kv)
+		}
+		if strings.TrimSpace(parts[1]) == "" {
+			return nil, false, fmt.Errorf("expected key=value for --custom, got %q", kv)
 		}
 		userDefined = append(userDefined, &people.UserDefined{
 			Key:   strings.TrimSpace(parts[0]),
 			Value: strings.TrimSpace(parts[1]),
 		})
 	}
-	return userDefined, nil
+	return userDefined, false, nil
+}
+
+func contactsURLs(values []string) []*people.Url {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make([]*people.Url, 0, len(values))
+	for _, u := range values {
+		if trimmed := strings.TrimSpace(u); trimmed != "" {
+			out = append(out, &people.Url{Value: trimmed})
+		}
+	}
+	return out
+}
+
+func contactsApplyPersonName(person *people.Person, givenSet bool, given, familySet bool, family string) {
+	curGiven := ""
+	curFamily := ""
+	if len(person.Names) > 0 && person.Names[0] != nil {
+		curGiven = person.Names[0].GivenName
+		curFamily = person.Names[0].FamilyName
+	}
+	if givenSet {
+		curGiven = strings.TrimSpace(given)
+	}
+	if familySet {
+		curFamily = strings.TrimSpace(family)
+	}
+	person.Names = []*people.Name{{GivenName: curGiven, FamilyName: curFamily}}
+}
+
+func contactsApplyPersonOrganization(person *people.Person, orgSet bool, org, titleSet bool, title string) {
+	curOrg := ""
+	curTitle := ""
+	if len(person.Organizations) > 0 && person.Organizations[0] != nil {
+		curOrg = person.Organizations[0].Name
+		curTitle = person.Organizations[0].Title
+	}
+	if orgSet {
+		curOrg = strings.TrimSpace(org)
+	}
+	if titleSet {
+		curTitle = strings.TrimSpace(title)
+	}
+	if curOrg == "" && curTitle == "" {
+		person.Organizations = nil
+		return
+	}
+	person.Organizations = []*people.Organization{{Name: curOrg, Title: curTitle}}
 }
 
 func (c *ContactsCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
@@ -264,13 +317,7 @@ func (c *ContactsCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
 		}}
 	}
 	if len(c.URL) > 0 {
-		urls := make([]*people.Url, 0, len(c.URL))
-		for _, u := range c.URL {
-			if strings.TrimSpace(u) != "" {
-				urls = append(urls, &people.Url{Value: strings.TrimSpace(u)})
-			}
-		}
-		if len(urls) > 0 {
+		if urls := contactsURLs(c.URL); len(urls) > 0 {
 			p.Urls = urls
 		}
 	}
@@ -278,7 +325,7 @@ func (c *ContactsCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
 		p.Biographies = []*people.Biography{{Value: strings.TrimSpace(c.Note)}}
 	}
 	if len(c.Custom) > 0 {
-		userDefined, parseErr := parseCustomUserDefined(c.Custom, false)
+		userDefined, _, parseErr := parseCustomUserDefined(c.Custom, false)
 		if parseErr != nil {
 			return usage(parseErr.Error())
 		}
@@ -340,31 +387,30 @@ func (c *ContactsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *
 		return c.updateFromJSON(ctx, svc, resourceName, u)
 	}
 
-	existing, err := svc.People.Get(resourceName).PersonFields(contactsReadMask + ",birthdays,biographies,userDefined,metadata").Do()
+	existing, err := svc.People.Get(resourceName).PersonFields(contactsUpdateReadMask).Do()
 	if err != nil {
 		return err
 	}
 
 	updateFields := make([]string, 0, 8)
 
-	if flagProvided(kctx, "given") || flagProvided(kctx, "family") {
-		curGiven := ""
-		curFamily := ""
-		if len(existing.Names) > 0 && existing.Names[0] != nil {
-			curGiven = existing.Names[0].GivenName
-			curFamily = existing.Names[0].FamilyName
-		}
-		if flagProvided(kctx, "given") {
-			curGiven = strings.TrimSpace(c.Given)
-		}
-		if flagProvided(kctx, "family") {
-			curFamily = strings.TrimSpace(c.Family)
-		}
-		name := &people.Name{GivenName: curGiven, FamilyName: curFamily}
-		existing.Names = []*people.Name{name}
+	wantGiven := flagProvided(kctx, "given")
+	wantFamily := flagProvided(kctx, "family")
+	wantEmail := flagProvided(kctx, "email")
+	wantPhone := flagProvided(kctx, "phone")
+	wantOrg := flagProvided(kctx, "org")
+	wantTitle := flagProvided(kctx, "title")
+	wantURL := flagProvided(kctx, "url")
+	wantNote := flagProvided(kctx, "note")
+	wantBirthday := flagProvided(kctx, "birthday")
+	wantNotes := flagProvided(kctx, "notes")
+	wantCustom := flagProvided(kctx, "custom")
+
+	if wantGiven || wantFamily {
+		contactsApplyPersonName(existing, wantGiven, c.Given, wantFamily, c.Family)
 		updateFields = append(updateFields, "names")
 	}
-	if flagProvided(kctx, "email") {
+	if wantEmail {
 		if strings.TrimSpace(c.Email) == "" {
 			existing.EmailAddresses = nil // will be forced to [] for patch
 		} else {
@@ -372,7 +418,7 @@ func (c *ContactsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *
 		}
 		updateFields = append(updateFields, "emailAddresses")
 	}
-	if flagProvided(kctx, "phone") {
+	if wantPhone {
 		if strings.TrimSpace(c.Phone) == "" {
 			existing.PhoneNumbers = nil // will be forced to [] for patch
 		} else {
@@ -380,41 +426,20 @@ func (c *ContactsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *
 		}
 		updateFields = append(updateFields, "phoneNumbers")
 	}
-	if flagProvided(kctx, "org") || flagProvided(kctx, "title") {
-		curOrg := ""
-		curTitle := ""
-		if len(existing.Organizations) > 0 && existing.Organizations[0] != nil {
-			curOrg = existing.Organizations[0].Name
-			curTitle = existing.Organizations[0].Title
-		}
-		if flagProvided(kctx, "org") {
-			curOrg = strings.TrimSpace(c.Organization)
-		}
-		if flagProvided(kctx, "title") {
-			curTitle = strings.TrimSpace(c.Title)
-		}
-		if curOrg == "" && curTitle == "" {
-			existing.Organizations = nil
-		} else {
-			existing.Organizations = []*people.Organization{{Name: curOrg, Title: curTitle}}
-		}
+	if wantOrg || wantTitle {
+		contactsApplyPersonOrganization(existing, wantOrg, c.Organization, wantTitle, c.Title)
 		updateFields = append(updateFields, "organizations")
 	}
-	if flagProvided(kctx, "url") {
-		if len(c.URL) == 0 || (len(c.URL) == 1 && strings.TrimSpace(c.URL[0]) == "") {
+	if wantURL {
+		urls := contactsURLs(c.URL)
+		if len(urls) == 0 {
 			existing.Urls = nil
 		} else {
-			urls := make([]*people.Url, 0, len(c.URL))
-			for _, u := range c.URL {
-				if strings.TrimSpace(u) != "" {
-					urls = append(urls, &people.Url{Value: strings.TrimSpace(u)})
-				}
-			}
 			existing.Urls = urls
 		}
 		updateFields = append(updateFields, "urls")
 	}
-	if flagProvided(kctx, "note") {
+	if wantNote {
 		if strings.TrimSpace(c.Note) == "" {
 			existing.Biographies = nil
 		} else {
@@ -422,15 +447,20 @@ func (c *ContactsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *
 		}
 		updateFields = append(updateFields, "biographies")
 	}
-	if flagProvided(kctx, "custom") {
-		userDefined, parseErr := parseCustomUserDefined(c.Custom, true)
+	if wantCustom {
+		userDefined, clear, parseErr := parseCustomUserDefined(c.Custom, true)
 		if parseErr != nil {
 			return usage(parseErr.Error())
-		existing.UserDefined = userDefined
+		}
+		if clear {
+			existing.UserDefined = nil
+		} else {
+			existing.UserDefined = userDefined
+		}
 		updateFields = append(updateFields, "userDefined")
 	}
 
-	if flagProvided(kctx, "birthday") {
+	if wantBirthday {
 		if strings.TrimSpace(c.Birthday) == "" {
 			existing.Birthdays = nil // will be forced to [] for patch
 		} else {
@@ -446,7 +476,7 @@ func (c *ContactsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *
 		updateFields = append(updateFields, "birthdays")
 	}
 
-	if flagProvided(kctx, "notes") {
+	if wantNotes {
 		if strings.TrimSpace(c.Notes) == "" {
 			existing.Biographies = nil // will be forced to [] for patch
 		} else {
