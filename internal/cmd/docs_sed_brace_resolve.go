@@ -28,7 +28,6 @@ var namedColors = map[string]string{
 	"teal":      "#008080",
 }
 
-
 // resolveColor returns hex from a color name or passes through hex values.
 // If the input is a named color, returns its hex equivalent.
 // If already hex (#RRGGBB), returns as-is.
@@ -66,7 +65,6 @@ func resolveHeading(h string) string {
 	}
 	return h
 }
-
 
 // alignMap maps SEDMAT alignment values to Google Docs alignment constants.
 var alignMap = map[string]string{

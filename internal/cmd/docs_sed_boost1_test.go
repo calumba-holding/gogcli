@@ -63,12 +63,13 @@ func buildDocWithInlineImage(objectID, alt string) *docs.Document {
 			}, StartIndex: 1, EndIndex: 16},
 		}},
 		InlineObjects: map[string]docs.InlineObject{
-			objectID: {InlineObjectProperties: &docs.InlineObjectProperties{
-				EmbeddedObject: &docs.EmbeddedObject{
-					Title:       alt,
-					Description: alt,
+			objectID: {
+				InlineObjectProperties: &docs.InlineObjectProperties{
+					EmbeddedObject: &docs.EmbeddedObject{
+						Title:       alt,
+						Description: alt,
+					},
 				},
-			},
 			},
 		},
 	}

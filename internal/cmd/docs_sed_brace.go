@@ -104,7 +104,6 @@ var boolFlagMap = map[string]string{
 	"smallcaps": "w",
 }
 
-
 // parseBraceExpr parses the content inside a brace expression.
 // Input is the content between { }, e.g. for `{b c=red t=hello}` the input is `b c=red t=hello`.
 func parseBraceExpr(s string) (*braceExpr, error) {
