@@ -165,6 +165,60 @@ func TestExecute_ChatMessagesReactionsCreate_BareIDWithSpace(t *testing.T) {
 	}
 }
 
+func TestExecute_ChatMessagesReact_Shorthand(t *testing.T) {
+	origNew := newChatService
+	t.Cleanup(func() { newChatService = origNew })
+
+	var gotPath string
+	var gotEmoji string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !(r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/reactions")) {
+			http.NotFound(w, r)
+			return
+		}
+		gotPath = r.URL.Path
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if emoji, ok := body["emoji"].(map[string]any); ok {
+			gotEmoji, _ = emoji["unicode"].(string)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"name":  "spaces/AAA/messages/msg1/reactions/r1",
+			"emoji": map[string]any{"unicode": gotEmoji},
+		})
+	}))
+	defer srv.Close()
+
+	svc, err := chat.NewService(context.Background(),
+		option.WithoutAuthentication(),
+		option.WithHTTPClient(srv.Client()),
+		option.WithEndpoint(srv.URL+"/"),
+	)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	newChatService = func(context.Context, string) (*chat.Service, error) { return svc, nil }
+
+	out := captureStdout(t, func() {
+		_ = captureStderr(t, func() {
+			if err := Execute([]string{"--account", "a@b.com", "chat", "messages", "react", "spaces/AAA/messages/msg1", "📦"}); err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+		})
+	})
+
+	if !strings.Contains(gotPath, "spaces/AAA/messages/msg1/reactions") {
+		t.Fatalf("unexpected request path: %q", gotPath)
+	}
+	if gotEmoji != "📦" {
+		t.Fatalf("unexpected emoji sent: %q", gotEmoji)
+	}
+	if !strings.Contains(out, "spaces/AAA/messages/msg1/reactions/r1") {
+		t.Fatalf("unexpected output: %q", out)
+	}
+}
+
 func TestExecute_ChatMessagesReactionsCreate_ConsumerBlocked(t *testing.T) {
 	origNew := newChatService
 	t.Cleanup(func() { newChatService = origNew })

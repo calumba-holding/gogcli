@@ -12,6 +12,17 @@ import (
 	"github.com/steipete/gogcli/internal/ui"
 )
 
+type ChatMessagesReactCmd struct {
+	Message string `arg:"" name:"message" help:"Message resource (spaces/.../messages/...) or bare message ID"`
+	Emoji   string `arg:"" name:"emoji" help:"Emoji unicode character (e.g. 👍)"`
+	Space   string `name:"space" help:"Space name (required when message is a bare ID)"`
+}
+
+func (c *ChatMessagesReactCmd) Run(ctx context.Context, flags *RootFlags) error {
+	cmd := &ChatMessagesReactionsCreateCmd{Message: c.Message, Emoji: c.Emoji, Space: c.Space}
+	return cmd.Run(ctx, flags)
+}
+
 type ChatMessagesReactionsCmd struct {
 	Create ChatMessagesReactionsCreateCmd `cmd:"" name:"create" aliases:"add" help:"Add an emoji reaction to a message"`
 	List   ChatMessagesReactionsListCmd   `cmd:"" name:"list" aliases:"ls" help:"List reactions on a message"`
