@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -402,13 +401,12 @@ func (c *DocsFindReplaceCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return c.runReplaceAll(ctx, u, svc, docID, replaceText)
 	}
 
-	doc, targetDoc, err := c.loadTargetDocument(ctx, svc, docID)
+	loaded, err := loadDocsTargetDocument(ctx, svc, docID, c.TabID)
 	if err != nil {
 		return err
 	}
-	if targetDoc == nil {
-		return errors.New("doc not found")
-	}
+	doc := loaded.full
+	targetDoc := loaded.target
 
 	if c.First {
 		startIdx, endIdx, total := findTextInDoc(targetDoc, c.Find, c.MatchCase)
@@ -434,10 +432,11 @@ func (c *DocsFindReplaceCmd) Run(ctx context.Context, flags *RootFlags) error {
 		if i == 0 {
 			continue
 		}
-		doc, _, err = c.loadTargetDocument(ctx, svc, docID)
+		loaded, err = loadDocsTargetDocument(ctx, svc, docID, c.TabID)
 		if err != nil {
 			return fmt.Errorf("re-reading document: %w", err)
 		}
+		doc = loaded.full
 	}
 
 	if outfmt.IsJSON(ctx) {
@@ -463,35 +462,15 @@ func (c *DocsFindReplaceCmd) Run(ctx context.Context, flags *RootFlags) error {
 	return nil
 }
 
-const (
-	docsContentFormatPlain    = "plain"
-	docsContentFormatMarkdown = "markdown"
-)
-
 func (c *DocsFindReplaceCmd) runReplaceAll(ctx context.Context, u *ui.UI, svc *docs.Service, docID, replaceText string) error {
-	req := &docs.ReplaceAllTextRequest{
-		ContainsText: &docs.SubstringMatchCriteria{Text: c.Find, MatchCase: c.MatchCase},
-		ReplaceText:  replaceText,
-	}
-	if c.TabID != "" {
-		req.TabsCriteria = &docs.TabsCriteria{TabIds: []string{c.TabID}}
-	}
-
-	result, err := svc.Documents.BatchUpdate(docID, &docs.BatchUpdateDocumentRequest{
-		Requests: []*docs.Request{{ReplaceAllText: req}},
-	}).Context(ctx).Do()
+	documentID, replacements, err := runDocsReplaceAll(ctx, svc, docID, c.Find, replaceText, c.MatchCase, c.TabID)
 	if err != nil {
-		return fmt.Errorf("find-replace: %w", err)
-	}
-
-	replacements := int64(0)
-	if len(result.Replies) > 0 && result.Replies[0].ReplaceAllText != nil {
-		replacements = result.Replies[0].ReplaceAllText.OccurrencesChanged
+		return err
 	}
 
 	if outfmt.IsJSON(ctx) {
 		payload := map[string]any{
-			"documentId":   result.DocumentId,
+			"documentId":   documentID,
 			"find":         c.Find,
 			"replace":      replaceText,
 			"replacements": replacements,
@@ -502,7 +481,7 @@ func (c *DocsFindReplaceCmd) runReplaceAll(ctx context.Context, u *ui.UI, svc *d
 		return outfmt.WriteJSON(ctx, os.Stdout, payload)
 	}
 
-	u.Out().Printf("documentId\t%s", result.DocumentId)
+	u.Out().Printf("documentId\t%s", documentID)
 	u.Out().Printf("find\t%s", c.Find)
 	u.Out().Printf("replace\t%s", replaceText)
 	u.Out().Printf("replacements\t%d", replacements)
@@ -512,124 +491,16 @@ func (c *DocsFindReplaceCmd) runReplaceAll(ctx context.Context, u *ui.UI, svc *d
 	return nil
 }
 
-func (c *DocsFindReplaceCmd) loadTargetDocument(ctx context.Context, svc *docs.Service, docID string) (*docs.Document, *docs.Document, error) {
-	getCall := svc.Documents.Get(docID).Context(ctx)
-	if c.TabID != "" {
-		getCall = getCall.IncludeTabsContent(true)
-	}
-
-	doc, err := getCall.Do()
-	if err != nil {
-		if isDocsNotFound(err) {
-			return nil, nil, fmt.Errorf("doc not found or not a Google Doc (id=%s)", docID)
-		}
-		return nil, nil, err
-	}
-	if doc == nil {
-		return nil, nil, errors.New("doc not found")
-	}
-	if c.TabID == "" {
-		return doc, doc, nil
-	}
-
-	tab := findTabByID(flattenTabs(doc.Tabs), c.TabID)
-	if tab == nil {
-		return nil, nil, fmt.Errorf("tab not found: %s", c.TabID)
-	}
-	if tab.DocumentTab == nil || tab.DocumentTab.Body == nil {
-		return nil, nil, fmt.Errorf("tab has no document body: %s", c.TabID)
-	}
-	return doc, &docs.Document{
-		DocumentId: doc.DocumentId,
-		RevisionId: doc.RevisionId,
-		Body:       tab.DocumentTab.Body,
-	}, nil
-}
-
 func (c *DocsFindReplaceCmd) runPlain(ctx context.Context, svc *docs.Service, doc *docs.Document, startIdx, endIdx int64, replaceText string) error {
-	_, err := svc.Documents.BatchUpdate(doc.DocumentId, &docs.BatchUpdateDocumentRequest{
-		WriteControl: &docs.WriteControl{RequiredRevisionId: doc.RevisionId},
-		Requests: []*docs.Request{
-			{
-				DeleteContentRange: &docs.DeleteContentRangeRequest{
-					Range: &docs.Range{StartIndex: startIdx, EndIndex: endIdx, TabId: c.TabID},
-				},
-			},
-			{
-				InsertText: &docs.InsertTextRequest{
-					Location: &docs.Location{Index: startIdx, TabId: c.TabID},
-					Text:     replaceText,
-				},
-			},
-		},
-	}).Context(ctx).Do()
-	if err != nil {
-		return fmt.Errorf("replace: %w", err)
-	}
-	return nil
+	return replaceDocsTextRange(ctx, svc, doc, startIdx, endIdx, replaceText, c.TabID)
 }
 
 func (c *DocsFindReplaceCmd) runMarkdown(ctx context.Context, svc *docs.Service, account string, doc *docs.Document, startIdx, endIdx int64, replaceText string) error {
-	cleaned, images := extractMarkdownImages(replaceText)
-	elements := ParseMarkdown(cleaned)
-	formattingRequests, textToInsert, tables := MarkdownToDocsRequests(elements, startIdx)
-
-	requests := make([]*docs.Request, 0, 2+len(formattingRequests))
-	requests = append(requests,
-		&docs.Request{
-			DeleteContentRange: &docs.DeleteContentRangeRequest{
-				Range: &docs.Range{StartIndex: startIdx, EndIndex: endIdx},
-			},
-		},
-		&docs.Request{
-			InsertText: &docs.InsertTextRequest{
-				Location: &docs.Location{Index: startIdx},
-				Text:     textToInsert,
-			},
-		},
-	)
-	requests = append(requests, formattingRequests...)
-
-	_, err := svc.Documents.BatchUpdate(doc.DocumentId, &docs.BatchUpdateDocumentRequest{
-		WriteControl: &docs.WriteControl{RequiredRevisionId: doc.RevisionId},
-		Requests:     requests,
-	}).Context(ctx).Do()
-	if err != nil {
-		return fmt.Errorf("replace (markdown): %w", err)
-	}
-
-	if len(tables) > 0 {
-		tableInserter := NewTableInserter(svc, doc.DocumentId)
-		tableOffset := int64(0)
-		for _, table := range tables {
-			tableIndex := table.StartIndex + tableOffset
-			tableEnd, tableErr := tableInserter.InsertNativeTable(ctx, tableIndex, table.Cells)
-			if tableErr != nil {
-				return fmt.Errorf("insert native table: %w", tableErr)
-			}
-			if tableEnd > tableIndex {
-				tableOffset += (tableEnd - tableIndex) - 1
-			}
-		}
-	}
-
-	if len(images) > 0 {
-		imgErr := c.insertImages(ctx, account, svc, doc.DocumentId, images)
-		cleanupImagePlaceholders(ctx, svc, doc.DocumentId, images)
-		if imgErr != nil {
-			return fmt.Errorf("insert images: %w", imgErr)
-		}
-	}
-
-	return nil
-}
-
-func (c *DocsFindReplaceCmd) insertImages(ctx context.Context, account string, svc *docs.Service, docID string, images []markdownImage) error {
 	basePath := c.ContentFile
 	if basePath == "" {
 		basePath = "."
 	}
-	return insertImagesIntoDocs(ctx, account, svc, docID, images, basePath)
+	return replaceDocsMarkdownRange(ctx, svc, account, doc, startIdx, endIdx, replaceText, basePath)
 }
 
 func (c *DocsFindReplaceCmd) printFirstResult(ctx context.Context, u *ui.UI, docID, replaceText string, replacements, total int) error {
@@ -671,101 +542,4 @@ func (c *DocsFindReplaceCmd) resolveReplaceText() (string, error) {
 		return "", fmt.Errorf("read content file: %w", err)
 	}
 	return string(data), nil
-}
-
-func cleanupImagePlaceholders(ctx context.Context, svc *docs.Service, docID string, images []markdownImage) {
-	reqs := make([]*docs.Request, 0, len(images))
-	for _, img := range images {
-		reqs = append(reqs, &docs.Request{
-			ReplaceAllText: &docs.ReplaceAllTextRequest{
-				ContainsText: &docs.SubstringMatchCriteria{
-					Text:      img.placeholder(),
-					MatchCase: true,
-				},
-				ReplaceText: "",
-			},
-		})
-	}
-	_, _ = svc.Documents.BatchUpdate(docID, &docs.BatchUpdateDocumentRequest{
-		Requests: reqs,
-	}).Context(ctx).Do()
-}
-
-func findTextInDoc(doc *docs.Document, searchText string, matchCase bool) (int64, int64, int) {
-	matches := findTextMatches(doc, searchText, matchCase)
-	if len(matches) == 0 {
-		return 0, 0, 0
-	}
-	return matches[0].startIndex, matches[0].endIndex, len(matches)
-}
-
-func findTextMatches(doc *docs.Document, searchText string, matchCase bool) []docRange {
-	if doc == nil || doc.Body == nil {
-		return nil
-	}
-
-	find := searchText
-	if !matchCase {
-		find = strings.ToLower(find)
-	}
-
-	var matches []docRange
-	findTextInElements(doc.Body.Content, searchText, find, matchCase, &matches)
-	return matches
-}
-
-func findTextInElements(elements []*docs.StructuralElement, searchText, find string, matchCase bool, matches *[]docRange) {
-	for _, el := range elements {
-		if el == nil {
-			continue
-		}
-		switch {
-		case el.Paragraph != nil:
-			findTextInParagraph(el.Paragraph, searchText, find, matchCase, matches)
-		case el.Table != nil:
-			for _, row := range el.Table.TableRows {
-				for _, cell := range row.TableCells {
-					findTextInElements(cell.Content, searchText, find, matchCase, matches)
-				}
-			}
-		}
-	}
-}
-
-func findTextInParagraph(para *docs.Paragraph, searchText, find string, matchCase bool, matches *[]docRange) {
-	var paraText strings.Builder
-	var paraStart int64
-	first := true
-	for _, pe := range para.Elements {
-		if pe.TextRun == nil {
-			continue
-		}
-		if first {
-			paraStart = pe.StartIndex
-			first = false
-		}
-		paraText.WriteString(pe.TextRun.Content)
-	}
-	if paraText.Len() == 0 {
-		return
-	}
-
-	text := paraText.String()
-	compareText := text
-	if !matchCase {
-		compareText = strings.ToLower(text)
-	}
-
-	offset := 0
-	for {
-		idx := strings.Index(compareText[offset:], find)
-		if idx < 0 {
-			break
-		}
-		absIdx := offset + idx
-		matchStart := paraStart + utf16Len(text[:absIdx])
-		matchEnd := matchStart + utf16Len(searchText)
-		*matches = append(*matches, docRange{startIndex: matchStart, endIndex: matchEnd})
-		offset = absIdx + len(find)
-	}
 }
