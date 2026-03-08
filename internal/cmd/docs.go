@@ -290,6 +290,7 @@ type DocsWriteCmd struct {
 	File     string `name:"file" help:"Text file path ('-' for stdin)"`
 	Append   bool   `name:"append" help:"Append instead of replacing the document body"`
 	Pageless bool   `name:"pageless" help:"Set document to pageless mode"`
+	TabID    string `name:"tab-id" help:"Target a specific tab by ID (see docs list-tabs)"`
 }
 
 func (c *DocsWriteCmd) Run(ctx context.Context, kctx *kong.Context, flags *RootFlags) error {
@@ -320,21 +321,10 @@ func (c *DocsWriteCmd) Run(ctx context.Context, kctx *kong.Context, flags *RootF
 		return err
 	}
 
-	doc, err := svc.Documents.Get(id).
-		Fields("documentId,body/content(startIndex,endIndex)").
-		Context(ctx).
-		Do()
+	endIndex, err := docsTargetEndIndex(ctx, svc, id, c.TabID)
 	if err != nil {
-		if isDocsNotFound(err) {
-			return fmt.Errorf("doc not found or not a Google Doc (id=%s)", id)
-		}
 		return err
 	}
-	if doc == nil {
-		return errors.New("doc not found")
-	}
-
-	endIndex := docsDocumentEndIndex(doc)
 	insertIndex := int64(1)
 	if c.Append {
 		insertIndex = docsAppendIndex(endIndex)
@@ -349,6 +339,7 @@ func (c *DocsWriteCmd) Run(ctx context.Context, kctx *kong.Context, flags *RootF
 					Range: &docs.Range{
 						StartIndex: 1,
 						EndIndex:   deleteEnd,
+						TabId:      c.TabID,
 					},
 				},
 			})
@@ -357,7 +348,7 @@ func (c *DocsWriteCmd) Run(ctx context.Context, kctx *kong.Context, flags *RootF
 
 	reqs = append(reqs, &docs.Request{
 		InsertText: &docs.InsertTextRequest{
-			Location: &docs.Location{Index: insertIndex},
+			Location: &docs.Location{Index: insertIndex, TabId: c.TabID},
 			Text:     text,
 		},
 	})
@@ -384,6 +375,9 @@ func (c *DocsWriteCmd) Run(ctx context.Context, kctx *kong.Context, flags *RootF
 			"append":     c.Append,
 			"index":      insertIndex,
 		}
+		if c.TabID != "" {
+			payload["tabId"] = c.TabID
+		}
 		if resp.WriteControl != nil {
 			payload["writeControl"] = resp.WriteControl
 		}
@@ -394,6 +388,9 @@ func (c *DocsWriteCmd) Run(ctx context.Context, kctx *kong.Context, flags *RootF
 	u.Out().Printf("requests\t%d", len(reqs))
 	u.Out().Printf("append\t%t", c.Append)
 	u.Out().Printf("index\t%d", insertIndex)
+	if c.TabID != "" {
+		u.Out().Printf("tabId\t%s", c.TabID)
+	}
 	if resp.WriteControl != nil && resp.WriteControl.RequiredRevisionId != "" {
 		u.Out().Printf("revision\t%s", resp.WriteControl.RequiredRevisionId)
 	}
@@ -406,6 +403,7 @@ type DocsUpdateCmd struct {
 	File     string `name:"file" help:"Text file path ('-' for stdin)"`
 	Index    int64  `name:"index" help:"Insert index (default: end of document)"`
 	Pageless bool   `name:"pageless" help:"Set document to pageless mode"`
+	TabID    string `name:"tab-id" help:"Target a specific tab by ID (see docs list-tabs)"`
 }
 
 func (c *DocsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *RootFlags) error {
@@ -442,27 +440,17 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *Root
 
 	insertIndex := c.Index
 	if insertIndex <= 0 {
-		var doc *docs.Document
-		doc, err = svc.Documents.Get(id).
-			Fields("documentId,body/content(startIndex,endIndex)").
-			Context(ctx).
-			Do()
-		if err != nil {
-			if isDocsNotFound(err) {
-				return fmt.Errorf("doc not found or not a Google Doc (id=%s)", id)
-			}
-			return err
+		endIndex, endErr := docsTargetEndIndex(ctx, svc, id, c.TabID)
+		if endErr != nil {
+			return endErr
 		}
-		if doc == nil {
-			return errors.New("doc not found")
-		}
-		insertIndex = docsAppendIndex(docsDocumentEndIndex(doc))
+		insertIndex = docsAppendIndex(endIndex)
 	}
 
 	reqs := []*docs.Request{
 		{
 			InsertText: &docs.InsertTextRequest{
-				Location: &docs.Location{Index: insertIndex},
+				Location: &docs.Location{Index: insertIndex, TabId: c.TabID},
 				Text:     text,
 			},
 		},
@@ -489,6 +477,9 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *Root
 			"requests":   len(reqs),
 			"index":      insertIndex,
 		}
+		if c.TabID != "" {
+			payload["tabId"] = c.TabID
+		}
 		if resp.WriteControl != nil {
 			payload["writeControl"] = resp.WriteControl
 		}
@@ -498,6 +489,9 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *Root
 	u.Out().Printf("id\t%s", resp.DocumentId)
 	u.Out().Printf("requests\t%d", len(reqs))
 	u.Out().Printf("index\t%d", insertIndex)
+	if c.TabID != "" {
+		u.Out().Printf("tabId\t%s", c.TabID)
+	}
 	if resp.WriteControl != nil && resp.WriteControl.RequiredRevisionId != "" {
 		u.Out().Printf("revision\t%s", resp.WriteControl.RequiredRevisionId)
 	}
@@ -721,6 +715,7 @@ type DocsInsertCmd struct {
 	Content string `arg:"" optional:"" name:"content" help:"Text to insert (or use --file / stdin)"`
 	Index   int64  `name:"index" help:"Character index to insert at (1 = beginning)" default:"1"`
 	File    string `name:"file" short:"f" help:"Read content from file (use - for stdin)"`
+	TabID   string `name:"tab-id" help:"Target a specific tab by ID (see docs list-tabs)"`
 }
 
 func (c *DocsInsertCmd) Run(ctx context.Context, flags *RootFlags) error {
@@ -758,6 +753,7 @@ func (c *DocsInsertCmd) Run(ctx context.Context, flags *RootFlags) error {
 				Text: content,
 				Location: &docs.Location{
 					Index: c.Index,
+					TabId: c.TabID,
 				},
 			},
 		}},
@@ -767,16 +763,23 @@ func (c *DocsInsertCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
+		payload := map[string]any{
 			"documentId": result.DocumentId,
 			"inserted":   len(content),
 			"atIndex":    c.Index,
-		})
+		}
+		if c.TabID != "" {
+			payload["tabId"] = c.TabID
+		}
+		return outfmt.WriteJSON(ctx, os.Stdout, payload)
 	}
 
 	u.Out().Printf("documentId\t%s", result.DocumentId)
 	u.Out().Printf("inserted\t%d bytes", len(content))
 	u.Out().Printf("atIndex\t%d", c.Index)
+	if c.TabID != "" {
+		u.Out().Printf("tabId\t%s", c.TabID)
+	}
 	return nil
 }
 
@@ -784,6 +787,7 @@ type DocsDeleteCmd struct {
 	DocID string `arg:"" name:"docId" help:"Doc ID"`
 	Start int64  `name:"start" required:"" help:"Start index (>= 1)"`
 	End   int64  `name:"end" required:"" help:"End index (> start)"`
+	TabID string `name:"tab-id" help:"Target a specific tab by ID (see docs list-tabs)"`
 }
 
 func (c *DocsDeleteCmd) Run(ctx context.Context, flags *RootFlags) error {
@@ -816,6 +820,7 @@ func (c *DocsDeleteCmd) Run(ctx context.Context, flags *RootFlags) error {
 				Range: &docs.Range{
 					StartIndex: c.Start,
 					EndIndex:   c.End,
+					TabId:      c.TabID,
 				},
 			},
 		}},
@@ -825,17 +830,24 @@ func (c *DocsDeleteCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
+		payload := map[string]any{
 			"documentId": result.DocumentId,
 			"deleted":    c.End - c.Start,
 			"startIndex": c.Start,
 			"endIndex":   c.End,
-		})
+		}
+		if c.TabID != "" {
+			payload["tabId"] = c.TabID
+		}
+		return outfmt.WriteJSON(ctx, os.Stdout, payload)
 	}
 
 	u.Out().Printf("documentId\t%s", result.DocumentId)
 	u.Out().Printf("deleted\t%d characters", c.End-c.Start)
 	u.Out().Printf("range\t%d-%d", c.Start, c.End)
+	if c.TabID != "" {
+		u.Out().Printf("tabId\t%s", c.TabID)
+	}
 	return nil
 }
 
@@ -956,6 +968,7 @@ type DocsFindReplaceCmd struct {
 	Find        string `arg:"" name:"find" help:"Text to find"`
 	ReplaceText string `arg:"" name:"replace" help:"Replacement text"`
 	MatchCase   bool   `name:"match-case" help:"Case-sensitive matching"`
+	TabID       string `name:"tab-id" help:"Target a specific tab by ID (see docs list-tabs)"`
 }
 
 func (c *DocsFindReplaceCmd) Run(ctx context.Context, flags *RootFlags) error {
@@ -978,16 +991,19 @@ func (c *DocsFindReplaceCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return err
 	}
 
+	req := &docs.ReplaceAllTextRequest{
+		ContainsText: &docs.SubstringMatchCriteria{
+			Text:      c.Find,
+			MatchCase: c.MatchCase,
+		},
+		ReplaceText: c.ReplaceText,
+	}
+	if c.TabID != "" {
+		req.TabsCriteria = &docs.TabsCriteria{TabIds: []string{c.TabID}}
+	}
+
 	result, err := svc.Documents.BatchUpdate(docID, &docs.BatchUpdateDocumentRequest{
-		Requests: []*docs.Request{{
-			ReplaceAllText: &docs.ReplaceAllTextRequest{
-				ContainsText: &docs.SubstringMatchCriteria{
-					Text:      c.Find,
-					MatchCase: c.MatchCase,
-				},
-				ReplaceText: c.ReplaceText,
-			},
-		}},
+		Requests: []*docs.Request{{ReplaceAllText: req}},
 	}).Context(ctx).Do()
 	if err != nil {
 		return fmt.Errorf("find-replace: %w", err)
@@ -999,18 +1015,25 @@ func (c *DocsFindReplaceCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
+		payload := map[string]any{
 			"documentId":   result.DocumentId,
 			"find":         c.Find,
 			"replace":      c.ReplaceText,
 			"replacements": replacements,
-		})
+		}
+		if c.TabID != "" {
+			payload["tabId"] = c.TabID
+		}
+		return outfmt.WriteJSON(ctx, os.Stdout, payload)
 	}
 
 	u.Out().Printf("documentId\t%s", result.DocumentId)
 	u.Out().Printf("find\t%s", c.Find)
 	u.Out().Printf("replace\t%s", c.ReplaceText)
 	u.Out().Printf("replacements\t%d", replacements)
+	if c.TabID != "" {
+		u.Out().Printf("tabId\t%s", c.TabID)
+	}
 	return nil
 }
 
@@ -1278,6 +1301,61 @@ func docsDocumentEndIndex(doc *docs.Document) int64 {
 		}
 	}
 	return end
+}
+
+func findTabByID(tabs []*docs.Tab, tabID string) *docs.Tab {
+	tabID = strings.TrimSpace(tabID)
+	for _, tab := range tabs {
+		if tab != nil && tab.TabProperties != nil && tab.TabProperties.TabId == tabID {
+			return tab
+		}
+	}
+	return nil
+}
+
+func docsTabEndIndex(tab *docs.Tab) int64 {
+	if tab == nil || tab.DocumentTab == nil || tab.DocumentTab.Body == nil {
+		return 1
+	}
+	end := int64(1)
+	for _, el := range tab.DocumentTab.Body.Content {
+		if el == nil {
+			continue
+		}
+		if el.EndIndex > end {
+			end = el.EndIndex
+		}
+	}
+	return end
+}
+
+func docsTargetEndIndex(ctx context.Context, svc *docs.Service, docID, tabID string) (int64, error) {
+	getCall := svc.Documents.Get(docID).Context(ctx)
+	if tabID != "" {
+		getCall = getCall.IncludeTabsContent(true)
+	} else {
+		getCall = getCall.Fields("documentId,body/content(startIndex,endIndex)")
+	}
+
+	doc, err := getCall.Do()
+	if err != nil {
+		if isDocsNotFound(err) {
+			return 0, fmt.Errorf("doc not found or not a Google Doc (id=%s)", docID)
+		}
+		return 0, err
+	}
+	if doc == nil {
+		return 0, errors.New("doc not found")
+	}
+	if tabID == "" {
+		return docsDocumentEndIndex(doc), nil
+	}
+
+	tab := findTabByID(flattenTabs(doc.Tabs), tabID)
+	if tab == nil {
+		return 0, fmt.Errorf("tab not found: %s", tabID)
+	}
+	return docsTabEndIndex(tab), nil
 }
 
 func docsAppendIndex(endIndex int64) int64 {

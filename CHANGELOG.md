@@ -11,6 +11,7 @@
 - Auth: add `--access-token` / `GOG_ACCESS_TOKEN` for direct access-token auth in headless or CI flows, bypassing stored refresh tokens. (#419) — thanks @mmkal.
 - Auth: add `auth add --redirect-uri` for manual/remote OAuth flows, so custom callback hosts can be reused across the printed auth URL, state cache, and code exchange. (#398) — thanks @salmonumbrella.
 - Auth: add `--extra-scopes` to `auth add` for appending custom OAuth scope URIs beyond the built-in service scopes. (#421) — thanks @peteradams2026.
+- Docs: add `--tab-id` to editing commands so write/update/insert/delete/find-replace can target a specific Google Docs tab. (#330) — thanks @ignacioreyna.
 - Chat: add `chat messages reactions create|list|delete` to manage emoji reactions on messages; `react` and `reaction` are aliases for the reactions command group. (#426) — thanks @fernandopps.
 - Sheets: add `sheets insert` to insert rows/columns into a sheet. (#203) — thanks @andybergon.
 - Sheets: add `sheets links` (alias `hyperlinks`) to list cell links from ranges, including rich-text links. (#374) — thanks @omothm.

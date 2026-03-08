@@ -904,10 +904,13 @@ gog docs list-tabs <docId>
 gog docs cat <docId> --tab "Notes"
 gog docs cat <docId> --all-tabs
 gog docs update <docId> --text "Append this later"
+gog docs update <docId> --text "Only in this tab" --tab-id t.notes
 gog docs update <docId> --file ./insert.txt --index 25 --pageless
 gog docs write <docId> --text "Fresh content"
+gog docs write <docId> --text "Rewrite one tab" --tab-id t.notes
 gog docs write <docId> --file ./body.txt --append --pageless
 gog docs find-replace <docId> "old" "new"
+gog docs find-replace <docId> "old" "new" --tab-id t.notes
 
 # Slides
 gog slides info <presentationId>
