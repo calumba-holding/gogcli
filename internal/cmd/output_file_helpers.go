@@ -60,3 +60,19 @@ func createUserOutputFile(path string) (*os.File, string, error) {
 		DirMode:   0o700,
 	})
 }
+
+func writePrivateFile(path string, data []byte, mode os.FileMode) error {
+	if mode == 0 {
+		mode = 0o600
+	}
+	// Path is resolved by the caller. This helper is for app-owned/private outputs.
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode) //nolint:gosec // caller controls target path semantics
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
+}

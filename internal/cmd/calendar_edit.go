@@ -133,7 +133,17 @@ func applyEventTypeTransparencyDefault(transparency, eventType string) string {
 	if transparency == "" && (eventType == eventTypeFocusTime || eventType == eventTypeOutOfOffice) {
 		return transparencyOpaque
 	}
+	if transparency == "" && eventType == eventTypeWorkingLocation {
+		return transparencyTransparent
+	}
 	return transparency
+}
+
+func applyEventTypeVisibilityDefault(visibility, eventType string) string {
+	if visibility == "" && eventType == eventTypeWorkingLocation {
+		return visibilityPublic
+	}
+	return visibility
 }
 
 func (c *CalendarCreateCmd) applyCreateEventType(event *calendar.Event, eventType string) error {
@@ -644,6 +654,14 @@ func (c *CalendarUpdateCmd) applyEventTypeProperties(kctx *kong.Context, patch *
 	if eventTypeRequested && !flagProvided(kctx, "transparency") &&
 		(eventType == eventTypeFocusTime || eventType == eventTypeOutOfOffice) {
 		patch.Transparency = transparencyOpaque
+		changed = true
+	}
+	if eventTypeRequested && !flagProvided(kctx, "transparency") && eventType == eventTypeWorkingLocation {
+		patch.Transparency = transparencyTransparent
+		changed = true
+	}
+	if eventTypeRequested && !flagProvided(kctx, "visibility") && eventType == eventTypeWorkingLocation {
+		patch.Visibility = visibilityPublic
 		changed = true
 	}
 

@@ -74,7 +74,7 @@ func buildCalendarCreatePlan(c *CalendarCreateCmd) (*calendarCreatePlan, error) 
 		Recurrence:         buildRecurrence(c.Recurrence),
 		Reminders:          reminders,
 		ColorId:            colorID,
-		Visibility:         visibility,
+		Visibility:         applyEventTypeVisibilityDefault(visibility, eventType),
 		Transparency:       applyEventTypeTransparencyDefault(transparency, eventType),
 		ConferenceData:     buildConferenceData(c.WithMeet),
 		Attachments:        buildAttachments(c.Attachments),

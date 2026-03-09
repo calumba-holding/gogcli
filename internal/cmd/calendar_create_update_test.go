@@ -490,6 +490,12 @@ func TestCalendarCreateCmd_EventTypeWorkingLocation(t *testing.T) {
 	if gotEvent.WorkingLocationProperties == nil || gotEvent.WorkingLocationProperties.Type != "officeLocation" {
 		t.Fatalf("unexpected working location props: %#v", gotEvent.WorkingLocationProperties)
 	}
+	if gotEvent.Transparency != transparencyTransparent {
+		t.Fatalf("expected transparent working location, got %q", gotEvent.Transparency)
+	}
+	if gotEvent.Visibility != "public" {
+		t.Fatalf("expected public working location visibility, got %q", gotEvent.Visibility)
+	}
 }
 
 func TestCalendarUpdateCmd_EventTypeOOO(t *testing.T) {
@@ -546,6 +552,59 @@ func TestCalendarUpdateCmd_EventTypeOOO(t *testing.T) {
 	}
 	if gotEvent.OutOfOfficeProperties.DeclineMessage != defaultOOODeclineMsg {
 		t.Fatalf("unexpected decline message: %q", gotEvent.OutOfOfficeProperties.DeclineMessage)
+	}
+}
+
+func TestCalendarUpdateCmd_EventTypeWorkingLocationDefaults(t *testing.T) {
+	origNew := newCalendarService
+	t.Cleanup(func() { newCalendarService = origNew })
+
+	var gotEvent calendar.Event
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/calendar/v3")
+		if r.Method == http.MethodPatch && path == "/calendars/cal@example.com/events/ev" {
+			_ = json.NewDecoder(r.Body).Decode(&gotEvent)
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id": "ev",
+			})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	svc, err := calendar.NewService(context.Background(),
+		option.WithoutAuthentication(),
+		option.WithHTTPClient(srv.Client()),
+		option.WithEndpoint(srv.URL+"/"),
+	)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	newCalendarService = func(context.Context, string) (*calendar.Service, error) { return svc, nil }
+
+	ctx := newCalendarJSONOutputContext(t, os.Stdout, os.Stderr)
+
+	cmd := &CalendarUpdateCmd{}
+	if err := runKong(t, cmd, []string{
+		"cal@example.com",
+		"ev",
+		"--event-type", "working-location",
+		"--working-location-type", "office",
+		"--working-office-label", "HQ",
+	}, ctx, &RootFlags{Account: "a@b.com"}); err != nil {
+		t.Fatalf("runKong: %v", err)
+	}
+
+	if gotEvent.EventType != eventTypeWorkingLocation {
+		t.Fatalf("expected workingLocation event type, got %q", gotEvent.EventType)
+	}
+	if gotEvent.Transparency != transparencyTransparent {
+		t.Fatalf("expected transparent working location, got %q", gotEvent.Transparency)
+	}
+	if gotEvent.Visibility != "public" {
+		t.Fatalf("expected public working location visibility, got %q", gotEvent.Visibility)
 	}
 }
 

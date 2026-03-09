@@ -37,6 +37,8 @@ func (c *CalendarWorkingLocationCmd) Run(ctx context.Context, flags *RootFlags) 
 		Start:                     &calendar.EventDateTime{Date: strings.TrimSpace(c.From)},
 		End:                       &calendar.EventDateTime{Date: strings.TrimSpace(c.To)},
 		EventType:                 eventTypeWorkingLocation,
+		Visibility:                visibilityPublic,
+		Transparency:              transparencyTransparent,
 		WorkingLocationProperties: props,
 	}
 
