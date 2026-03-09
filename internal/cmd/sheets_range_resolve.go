@@ -14,6 +14,7 @@ type spreadsheetRangeCatalog struct {
 	SheetIDsByTitle map[string]int64
 	SheetTitlesByID map[int64]string
 	NamedRanges     []*sheets.NamedRange
+	Sheets          []*sheets.SheetProperties
 }
 
 func fetchSpreadsheetRangeCatalog(ctx context.Context, svc *sheets.Service, spreadsheetID string) (*spreadsheetRangeCatalog, error) {
@@ -29,10 +30,12 @@ func fetchSpreadsheetRangeCatalog(ctx context.Context, svc *sheets.Service, spre
 
 	idsByTitle := make(map[string]int64, len(resp.Sheets))
 	titlesByID := make(map[int64]string, len(resp.Sheets))
+	props := make([]*sheets.SheetProperties, 0, len(resp.Sheets))
 	for _, sh := range resp.Sheets {
 		if sh == nil || sh.Properties == nil {
 			continue
 		}
+		props = append(props, sh.Properties)
 		// Keep exact title bytes for map key parity with parsed quoted A1 names.
 		title := sh.Properties.Title
 		if title == "" {
@@ -46,6 +49,7 @@ func fetchSpreadsheetRangeCatalog(ctx context.Context, svc *sheets.Service, spre
 		SheetIDsByTitle: idsByTitle,
 		SheetTitlesByID: titlesByID,
 		NamedRanges:     resp.NamedRanges,
+		Sheets:          props,
 	}, nil
 }
 

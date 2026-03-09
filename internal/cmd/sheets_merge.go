@@ -3,13 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"google.golang.org/api/sheets/v4"
-
-	"github.com/steipete/gogcli/internal/outfmt"
-	"github.com/steipete/gogcli/internal/ui"
 )
 
 type SheetsMergeCmd struct {
@@ -19,8 +15,6 @@ type SheetsMergeCmd struct {
 }
 
 func (c *SheetsMergeCmd) Run(ctx context.Context, flags *RootFlags) error {
-	u := ui.FromContext(ctx)
-
 	spreadsheetID := normalizeGoogleID(strings.TrimSpace(c.SpreadsheetID))
 	rangeSpec := cleanRange(c.Range)
 	if spreadsheetID == "" {
@@ -40,55 +34,35 @@ func (c *SheetsMergeCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return err
 	}
 
-	if dryRunErr := dryRunExit(ctx, flags, "sheets.merge", map[string]any{
+	return runSheetsMutation(ctx, flags, "sheets.merge", map[string]any{
 		"spreadsheet_id": spreadsheetID,
 		"range":          rangeSpec,
 		"type":           mergeType,
-	}); dryRunErr != nil {
-		return dryRunErr
-	}
-
-	account, err := requireAccount(flags)
-	if err != nil {
-		return err
-	}
-
-	svc, err := newSheetsService(ctx, account)
-	if err != nil {
-		return err
-	}
-
-	sheetIDs, err := fetchSheetIDMap(ctx, svc, spreadsheetID)
-	if err != nil {
-		return err
-	}
-	gridRange, err := gridRangeFromMap(rangeInfo, sheetIDs, "merge")
-	if err != nil {
-		return err
-	}
-
-	req := &sheets.BatchUpdateSpreadsheetRequest{
-		Requests: []*sheets.Request{{
-			MergeCells: &sheets.MergeCellsRequest{
-				Range:     gridRange,
-				MergeType: mergeType,
-			},
-		}},
-	}
-
-	if _, err := svc.Spreadsheets.BatchUpdate(spreadsheetID, req).Do(); err != nil {
-		return err
-	}
-
-	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
+	}, func(ctx context.Context, svc *sheets.Service) (map[string]any, string, error) {
+		sheetIDs, err := fetchSheetIDMap(ctx, svc, spreadsheetID)
+		if err != nil {
+			return nil, "", err
+		}
+		gridRange, err := gridRangeFromMap(rangeInfo, sheetIDs, "merge")
+		if err != nil {
+			return nil, "", err
+		}
+		req := &sheets.BatchUpdateSpreadsheetRequest{
+			Requests: []*sheets.Request{{
+				MergeCells: &sheets.MergeCellsRequest{
+					Range:     gridRange,
+					MergeType: mergeType,
+				},
+			}},
+		}
+		if err := applySheetsBatchUpdate(ctx, svc, spreadsheetID, req); err != nil {
+			return nil, "", err
+		}
+		return map[string]any{
 			"range": rangeSpec,
 			"type":  mergeType,
-		})
-	}
-
-	u.Out().Printf("Merged %s (%s)", rangeSpec, mergeType)
-	return nil
+		}, fmt.Sprintf("Merged %s (%s)", rangeSpec, mergeType), nil
+	})
 }
 
 type SheetsUnmergeCmd struct {
@@ -97,8 +71,6 @@ type SheetsUnmergeCmd struct {
 }
 
 func (c *SheetsUnmergeCmd) Run(ctx context.Context, flags *RootFlags) error {
-	u := ui.FromContext(ctx)
-
 	spreadsheetID := normalizeGoogleID(strings.TrimSpace(c.SpreadsheetID))
 	rangeSpec := cleanRange(c.Range)
 	if spreadsheetID == "" {
@@ -113,48 +85,28 @@ func (c *SheetsUnmergeCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return err
 	}
 
-	if dryRunErr := dryRunExit(ctx, flags, "sheets.unmerge", map[string]any{
+	return runSheetsMutation(ctx, flags, "sheets.unmerge", map[string]any{
 		"spreadsheet_id": spreadsheetID,
 		"range":          rangeSpec,
-	}); dryRunErr != nil {
-		return dryRunErr
-	}
-
-	account, err := requireAccount(flags)
-	if err != nil {
-		return err
-	}
-
-	svc, err := newSheetsService(ctx, account)
-	if err != nil {
-		return err
-	}
-
-	sheetIDs, err := fetchSheetIDMap(ctx, svc, spreadsheetID)
-	if err != nil {
-		return err
-	}
-	gridRange, err := gridRangeFromMap(rangeInfo, sheetIDs, "unmerge")
-	if err != nil {
-		return err
-	}
-
-	req := &sheets.BatchUpdateSpreadsheetRequest{
-		Requests: []*sheets.Request{{
-			UnmergeCells: &sheets.UnmergeCellsRequest{Range: gridRange},
-		}},
-	}
-
-	if _, err := svc.Spreadsheets.BatchUpdate(spreadsheetID, req).Do(); err != nil {
-		return err
-	}
-
-	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{"range": rangeSpec})
-	}
-
-	u.Out().Printf("Unmerged %s", rangeSpec)
-	return nil
+	}, func(ctx context.Context, svc *sheets.Service) (map[string]any, string, error) {
+		sheetIDs, err := fetchSheetIDMap(ctx, svc, spreadsheetID)
+		if err != nil {
+			return nil, "", err
+		}
+		gridRange, err := gridRangeFromMap(rangeInfo, sheetIDs, "unmerge")
+		if err != nil {
+			return nil, "", err
+		}
+		req := &sheets.BatchUpdateSpreadsheetRequest{
+			Requests: []*sheets.Request{{
+				UnmergeCells: &sheets.UnmergeCellsRequest{Range: gridRange},
+			}},
+		}
+		if err := applySheetsBatchUpdate(ctx, svc, spreadsheetID, req); err != nil {
+			return nil, "", err
+		}
+		return map[string]any{"range": rangeSpec}, fmt.Sprintf("Unmerged %s", rangeSpec), nil
+	})
 }
 
 func normalizeMergeType(raw string) (string, error) {
