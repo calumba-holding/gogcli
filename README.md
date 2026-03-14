@@ -19,7 +19,7 @@ Fast, script-friendly CLI for Gmail, Calendar, Chat, Classroom, Drive, Docs, Sli
 - **Forms** - create/update forms, manage questions, inspect responses, and manage watches
 - **Apps Script** - create/get/bind projects, inspect content, and run functions
 - **Analytics** - list GA4 account summaries and run reports via the Analytics Data API
-- **Search Console** - list properties and run Search Analytics queries
+- **Search Console** - list properties, run Search Analytics queries, and manage sitemaps
 - **Docs/Slides** - create/copy/export docs/slides, edit Docs by tab, import Markdown, do richer find-replace, export Docs as Markdown/HTML, and generate Slides from Markdown or templates
 - **People** - profile lookup and directory search helpers
 - **Keep (Workspace only)** - list/get/search/create/delete notes and download attachments (service account + domain-wide delegation)
@@ -401,7 +401,7 @@ Service scope matrix (auto-generated; run `go run scripts/gen-auth-services-md.g
 | forms | yes | Forms API | `https://www.googleapis.com/auth/forms.body`<br>`https://www.googleapis.com/auth/forms.responses.readonly` |  |
 | appscript | yes | Apps Script API | `https://www.googleapis.com/auth/script.projects`<br>`https://www.googleapis.com/auth/script.deployments`<br>`https://www.googleapis.com/auth/script.processes` |  |
 | analytics | yes | Analytics Admin API, Analytics Data API | `https://www.googleapis.com/auth/analytics.readonly` | GA4 account summaries + reporting |
-| searchconsole | yes | Search Console API | `https://www.googleapis.com/auth/webmasters.readonly` |  |
+| searchconsole | yes | Search Console API | `https://www.googleapis.com/auth/webmasters` | Search Analytics + sitemap management |
 | groups | no | Cloud Identity API | `https://www.googleapis.com/auth/cloud-identity.groups.readonly` | Workspace only |
 | keep | no | Keep API | `https://www.googleapis.com/auth/keep` | Workspace only; service account (domain-wide delegation) |
 <!-- auth-services:end -->
@@ -1163,10 +1163,18 @@ gog analytics report properties/123456789 --from 7daysAgo --to today --dimension
 ```bash
 # Sites/properties
 gog searchconsole sites
+gog searchconsole sites get sc-domain:example.com
 
 # Search Analytics query
 gog searchconsole query sc-domain:example.com --from 2026-02-01 --to 2026-02-07 --dimensions query,page --type WEB --max 1000
 gog searchconsole query https://example.com/ --from 2026-02-01 --to 2026-02-07 --dimensions date --type WEB
+gog searchconsole searchanalytics query sc-domain:example.com --from 2026-02-01 --to 2026-02-07 --filter query:contains:gog --aggregation BY_PAGE
+
+# Sitemaps
+gog searchconsole sitemaps sc-domain:example.com
+gog searchconsole sitemaps get sc-domain:example.com https://example.com/sitemap.xml
+gog searchconsole sitemaps submit sc-domain:example.com https://example.com/sitemap.xml
+gog searchconsole sitemaps delete sc-domain:example.com https://example.com/sitemap.xml --force
 ```
 
 ### People

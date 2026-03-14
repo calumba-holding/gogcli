@@ -587,8 +587,12 @@ func TestExecute_SearchConsoleQuery_JSON(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("decode request: %v", err)
 		}
-		if req["startDate"] != "2026-02-01" || req["endDate"] != "2026-02-07" || req["type"] != "WEB" {
+		if req["startDate"] != "2026-02-01" || req["endDate"] != "2026-02-07" || req["type"] != "web" {
 			t.Fatalf("unexpected request payload: %#v", req)
+		}
+		dimensions, ok := req["dimensions"].([]any)
+		if !ok || len(dimensions) != 2 || dimensions[0] != "query" || dimensions[1] != "page" {
+			t.Fatalf("unexpected dimensions payload: %#v", req["dimensions"])
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -643,7 +647,7 @@ func TestExecute_SearchConsoleQuery_JSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if parsed.SiteURL != "sc-domain:example.com" || parsed.Type != "WEB" || len(parsed.Rows) != 1 || len(parsed.Rows[0].Keys) != 2 {
+	if parsed.SiteURL != "sc-domain:example.com" || parsed.Type != "web" || len(parsed.Rows) != 1 || len(parsed.Rows[0].Keys) != 2 {
 		t.Fatalf("unexpected payload: %#v", parsed)
 	}
 }

@@ -310,6 +310,7 @@ func TestScopesForManageWithOptions_Readonly(t *testing.T) {
 		"https://www.googleapis.com/auth/tasks",
 		"https://www.googleapis.com/auth/spreadsheets",
 		"https://www.googleapis.com/auth/documents",
+		"https://www.googleapis.com/auth/webmasters",
 	}
 	for _, nw := range notWant {
 		if containsScope(scopes, nw) {
@@ -353,6 +354,28 @@ func TestScopes_ServiceKeep_DefaultIsReadonly(t *testing.T) {
 
 	if len(scopes) != 1 || scopes[0] != "https://www.googleapis.com/auth/keep" {
 		t.Fatalf("unexpected keep scopes: %#v", scopes)
+	}
+}
+
+func TestScopes_ServiceSearchConsole_DefaultIsWritable(t *testing.T) {
+	scopes, err := Scopes(ServiceSearchConsole)
+	if err != nil {
+		t.Fatalf("Scopes: %v", err)
+	}
+
+	if len(scopes) != 1 || scopes[0] != "https://www.googleapis.com/auth/webmasters" {
+		t.Fatalf("unexpected searchconsole scopes: %#v", scopes)
+	}
+}
+
+func TestScopesForServiceWithOptions_SearchConsole_Readonly(t *testing.T) {
+	scopes, err := scopesForServiceWithOptions(ServiceSearchConsole, ScopeOptions{Readonly: true})
+	if err != nil {
+		t.Fatalf("scopesForServiceWithOptions: %v", err)
+	}
+
+	if len(scopes) != 1 || scopes[0] != "https://www.googleapis.com/auth/webmasters.readonly" {
+		t.Fatalf("unexpected searchconsole readonly scopes: %#v", scopes)
 	}
 }
 

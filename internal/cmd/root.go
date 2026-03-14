@@ -80,7 +80,7 @@ type CLI struct {
 	Forms         FormsCmd              `cmd:"" aliases:"form" help:"Google Forms"`
 	AppScript     AppScriptCmd          `cmd:"" name:"appscript" aliases:"script,apps-script" help:"Google Apps Script"`
 	Analytics     AnalyticsCmd          `cmd:"" aliases:"ga" help:"Google Analytics"`
-	SearchConsole SearchConsoleCmd      `cmd:"" name:"searchconsole" aliases:"gsc,search-console" help:"Google Search Console"`
+	SearchConsole SearchConsoleCmd      `cmd:"" name:"searchconsole" aliases:"gsc,search-console,webmasters" help:"Google Search Console"`
 	Config        ConfigCmd             `cmd:"" help:"Manage configuration"`
 	ExitCodes     AgentExitCodesCmd     `cmd:"" name:"exit-codes" aliases:"exitcodes" help:"Print stable exit codes (alias for 'agent exit-codes')"`
 	Agent         AgentCmd              `cmd:"" help:"Agent-friendly helpers"`

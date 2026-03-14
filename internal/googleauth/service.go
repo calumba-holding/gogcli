@@ -214,9 +214,10 @@ var serviceInfoByService = map[Service]serviceInfo{
 		note:   "GA4 account summaries + reporting",
 	},
 	ServiceSearchConsole: {
-		scopes: []string{"https://www.googleapis.com/auth/webmasters.readonly"},
+		scopes: []string{"https://www.googleapis.com/auth/webmasters"},
 		user:   true,
 		apis:   []string{"Search Console API"},
+		note:   "Search Analytics + sitemap management",
 	},
 	ServiceGroups: {
 		scopes: []string{"https://www.googleapis.com/auth/cloud-identity.groups.readonly"},
@@ -570,6 +571,9 @@ func scopesForServiceWithOptions(service Service, opts ScopeOptions) ([]string, 
 	case ServiceAnalytics:
 		return Scopes(service)
 	case ServiceSearchConsole:
+		if opts.Readonly {
+			return []string{"https://www.googleapis.com/auth/webmasters.readonly"}, nil
+		}
 		return Scopes(service)
 	case ServiceGroups:
 		return Scopes(service)
