@@ -10,6 +10,7 @@
 - Gmail: encode plain-text send bodies as quoted-printable so long lines are not hard-wrapped in transit. (#476) — thanks @shashankkr9.
 - Contacts: reject all individual update flags when `contacts update --from-file` is used. (#439) — thanks @klodr.
 - Auth: remove stale aliases and account-client mappings from config when `auth remove` deletes an account. (#467) — thanks @mvanhorn.
+- Time parsing: accept `tues`, `thur`, and `thurs` as weekday expressions. (#440) — thanks @sjhddh.
 
 ## 0.12.0 - 2026-03-09
 
