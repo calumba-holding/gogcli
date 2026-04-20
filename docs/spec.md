@@ -188,8 +188,8 @@ Flag aliases:
 - `gog drive ls [--all] [--parent ID] [--max N] [--page TOKEN] [--query Q] [--[no-]all-drives]` (`--all` and `--parent` are mutually exclusive)
 - `gog drive search <text> [--raw-query] [--max N] [--page TOKEN] [--[no-]all-drives]`
 - `gog drive get <fileId>`
-- `gog drive download <fileId> [--out PATH] [--format F]` (`--format` only applies to Google Workspace files)
-- `gog drive upload <localPath> [--name N] [--parent ID] [--convert] [--convert-to doc|sheet|slides]`
+- `gog drive download <fileId> [--out PATH] [--format F]` (`--format` only applies to Google Workspace files; `--format md` exports a Google Doc as Markdown)
+- `gog drive upload <localPath> [--name N] [--parent ID] [--convert] [--convert-to doc|sheet|slides] [--keep-frontmatter]` (Markdown → Google Doc with `--convert` or `--convert-to doc`: leading `---`/`---` frontmatter is stripped before upload unless `--keep-frontmatter`; delimiter-based, not a full YAML parse)
 - `gog drive mkdir <name> [--parent ID]`
 - `gog drive delete <fileId> [--permanent]`
 - `gog drive move <fileId> --parent ID`

@@ -12,7 +12,7 @@ Fast, script-friendly CLI for Gmail, Calendar, Chat, Classroom, Drive, Docs, Sli
 - **Calendar** - list/create/update/delete events, manage invitations, aliases, subscriptions, team calendars, free/busy/conflicts, propose new times, focus/OOO/working-location events, recurrence, and reminders
 - **Classroom** - manage courses, roster, coursework/materials, submissions, announcements, topics, invitations, guardians, profiles
 - **Chat** - list/find/create spaces, list messages/threads, send messages and DMs, and manage emoji reactions (Workspace-only)
-- **Drive** - list/search/upload/download files, replace uploads in-place, convert uploads, manage permissions/comments, organize folders, and list shared drives
+- **Drive** - list/search/upload/download files, replace uploads in-place, convert uploads (including Markdown to Google Doc), manage permissions/comments, organize folders, and list shared drives
 - **Contacts** - search/create/update contacts, including addresses, relations, org/title metadata, custom fields, Workspace directory, and other contacts
 - **Tasks** - manage tasklists and tasks: get/create/add/update/done/undo/delete/clear, plus repeat schedule materialization with RRULE aliases
 - **Sheets** - read/write/update spreadsheets, insert rows/cols, manage tabs and named ranges, format/merge/freeze/resize cells, read/write notes, inspect formats, find/replace text, list links, and create/export sheets
@@ -895,6 +895,8 @@ gog time now --timezone UTC
 
 ### Drive
 
+When you turn a Markdown file into a Google Doc, use **`--convert`** (extension-based) or **`--convert-to doc`**. Leading YAML frontmatter between **`---`** lines is **removed before upload** unless you pass **`--keep-frontmatter`**. That step only looks for opening and closing delimiter lines—it is **not** a full YAML parse, so odd edge cases may need **`--keep-frontmatter`** or editing the file first.
+
 ```bash
 # List and search
 gog drive ls --max 20
@@ -914,9 +916,11 @@ gog drive upload ./path/to/file --replace <fileId>  # Replace file content in-pl
 gog drive upload ./report.docx --convert
 gog drive upload ./chart.png --convert-to sheet
 gog drive upload ./report.docx --convert --name report.docx
+gog drive upload ./notes.md --convert                              # Markdown → Google Doc (or use --convert-to doc)
 gog drive download <fileId> --out ./downloaded.bin
 gog drive download <fileId> --format pdf --out ./exported.pdf     # Google Workspace files only
 gog drive download <fileId> --format docx --out ./doc.docx
+gog drive download <fileId> --format md --out ./note.md            # Google Doc → Markdown
 gog drive download <fileId> --format pptx --out ./slides.pptx
 
 # Organize

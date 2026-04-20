@@ -441,7 +441,7 @@ func canUseNativeReplace(replacement string) bool {
 	}
 	// Horizontal rule
 	trimmedRepl := strings.TrimSpace(replacement)
-	if trimmedRepl == "---" || trimmedRepl == "***" || trimmedRepl == "___" {
+	if trimmedRepl == literalMarkdownTripleDash || trimmedRepl == "***" || trimmedRepl == "___" {
 		return false
 	}
 	// Numbered list pattern

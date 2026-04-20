@@ -352,6 +352,7 @@ func TestGoogleConvertMimeType(t *testing.T) {
 		{"deck.pptx", driveMimeGoogleSlides, true},
 		{"deck.ppt", driveMimeGoogleSlides, true},
 		{"notes.txt", driveMimeGoogleDoc, true},
+		{"notes.md", driveMimeGoogleDoc, true},
 		{"page.html", driveMimeGoogleDoc, true},
 		{"photo.png", "", false},
 		{"archive.zip", "", false},
@@ -394,6 +395,14 @@ func TestDriveUploadConvertMimeType(t *testing.T) {
 		t.Fatalf("auto convert = (%q, %v), want (%q, true)", mimeType, convert, driveMimeGoogleDoc)
 	}
 
+	mimeType, convert, err = driveUploadConvertMimeType("notes.md", true, "")
+	if err != nil {
+		t.Fatalf("auto convert md: %v", err)
+	}
+	if !convert || mimeType != driveMimeGoogleDoc {
+		t.Fatalf("auto convert md = (%q, %v), want (%q, true)", mimeType, convert, driveMimeGoogleDoc)
+	}
+
 	mimeType, convert, err = driveUploadConvertMimeType("photo.png", false, "sheet")
 	if err != nil {
 		t.Fatalf("explicit convert: %v", err)
@@ -426,6 +435,7 @@ func TestStripOfficeExt(t *testing.T) {
 		{"budget.xls", "budget"},
 		{"deck.pptx", "deck"},
 		{"deck.ppt", "deck"},
+		{"notes.md", "notes"},
 		{"notes.txt", "notes.txt"},
 		{"photo.png", "photo.png"},
 		{"no-ext", "no-ext"},

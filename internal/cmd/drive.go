@@ -234,6 +234,7 @@ type DriveUploadCmd struct {
 	KeepRevisionForever bool   `name:"keep-revision-forever" help:"Keep the new head revision forever (binary files only)"`
 	Convert             bool   `name:"convert" help:"Auto-convert to native Google format based on file extension (create only)"`
 	ConvertTo           string `name:"convert-to" help:"Convert to a specific Google format: doc|sheet|slides (create only)"`
+	KeepFrontmatter     bool   `name:"keep-frontmatter" help:"Keep YAML frontmatter (---) in Markdown when converting to a Google Doc (--convert or --convert-to doc; default: strip)"`
 }
 
 type DriveMkdirCmd struct {
@@ -1121,7 +1122,7 @@ func googleConvertMimeType(path string) (string, bool) {
 		return driveMimeGoogleSheet, true
 	case extPptx, ".ppt":
 		return driveMimeGoogleSlides, true
-	case extTXT, ".html":
+	case extTXT, ".html", extMD:
 		return driveMimeGoogleDoc, true
 	default:
 		return "", false
@@ -1156,7 +1157,7 @@ func driveUploadConvertMimeType(path string, auto bool, target string) (string, 
 
 	mimeType, ok := googleConvertMimeType(path)
 	if !ok {
-		return "", false, fmt.Errorf("--convert: unsupported file type %q (supported: docx, xlsx, pptx, doc, xls, ppt, csv, txt, html)", filepath.Ext(path))
+		return "", false, fmt.Errorf("--convert: unsupported file type %q (supported: docx, xlsx, pptx, doc, xls, ppt, csv, txt, html, md)", filepath.Ext(path))
 	}
 	return mimeType, true, nil
 }
@@ -1166,7 +1167,7 @@ func driveUploadConvertMimeType(path string, auto bool, target string) (string, 
 func stripOfficeExt(name string) string {
 	ext := strings.ToLower(filepath.Ext(name))
 	switch ext {
-	case extDocx, ".doc", extXlsx, ".xls", extPptx, ".ppt":
+	case extDocx, ".doc", extXlsx, ".xls", extPptx, ".ppt", extMD:
 		return strings.TrimSuffix(name, filepath.Ext(name))
 	default:
 		return name
