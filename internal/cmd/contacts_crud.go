@@ -341,6 +341,15 @@ func contactsApplyPersonOrganization(person *people.Person, orgSet bool, org str
 	person.Organizations = []*people.Organization{{Name: curOrg, Title: curTitle}}
 }
 
+func anyFlagProvided(kctx *kong.Context, names ...string) bool {
+	for _, name := range names {
+		if flagProvided(kctx, name) {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *ContactsCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u := ui.FromContext(ctx)
 	account, err := requireAccount(flags)
@@ -459,10 +468,12 @@ func (c *ContactsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *
 	}
 
 	if strings.TrimSpace(c.FromFile) != "" {
-		if flagProvided(kctx, "given") || flagProvided(kctx, "family") || flagProvided(kctx, "email") || flagProvided(kctx, "phone") ||
-			flagProvided(kctx, "org") || flagProvided(kctx, "title") || flagProvided(kctx, "url") ||
-			flagProvided(kctx, "note") || flagProvided(kctx, "address") || flagProvided(kctx, "gender") || flagProvided(kctx, "custom") ||
-			flagProvided(kctx, "birthday") || flagProvided(kctx, "notes") || flagProvided(kctx, "relation") {
+		if anyFlagProvided(kctx,
+			"given", "family", "email", "phone",
+			"org", "title", "url", "note",
+			"address", "gender", "custom", "birthday",
+			"notes", "relation",
+		) {
 			return usage("can't combine --from-file with other update flags")
 		}
 		return c.updateFromJSON(ctx, svc, resourceName, u)

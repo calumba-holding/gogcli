@@ -214,11 +214,11 @@ func (c *GmailLabelsStyleCmd) Run(ctx context.Context, flags *RootFlags) error {
 	if textColor == "" && backgroundColor == "" && c.LabelListVisibility == "" && c.MessageListVisibility == "" {
 		return usage("specify at least one style field")
 	}
-	if err := validateGmailLabelVisibility(c.LabelListVisibility, "--label-list-visibility", "labelShow", "labelShowIfUnread", "labelHide"); err != nil {
-		return err
+	if validateErr := validateGmailLabelVisibility(c.LabelListVisibility, "--label-list-visibility", "labelShow", "labelShowIfUnread", "labelHide"); validateErr != nil {
+		return validateErr
 	}
-	if err := validateGmailLabelVisibility(c.MessageListVisibility, "--message-list-visibility", "show", "hide"); err != nil {
-		return err
+	if validateErr := validateGmailLabelVisibility(c.MessageListVisibility, "--message-list-visibility", "show", "hide"); validateErr != nil {
+		return validateErr
 	}
 
 	patch := &gmail.Label{
