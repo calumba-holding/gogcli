@@ -2,40 +2,44 @@
 
 ## Unreleased
 
+### Highlights
+- Gmail: safer sending and richer message workflows, with no-send guardrails, forwarding, autoreplies, full-body search output, label styling, and better MIME/body handling. (#454, #482, #447, #457, #476, #477, #511) — thanks @veteranbv, @spencer-c-reed, @GodsBoy, @iskw9973, @shashankkr9, @yeager, and @dinakars777.
+- Drive/Docs/Slides: smoother content round-trips with Markdown-to-Docs upload conversion, restored Markdown replace writes, rendered slide thumbnails, commenter sharing, and better Docs sed formatting. (#487, #501, #498, #443, #483) — thanks @johnbenjaminlewis, @twilsher, @gianpaj, @pavelzak, and @bill492.
+- Sheets: chart management lands, including list/inspect/create/update/delete and a chart-range fix for sheet ID 0. (#434) — thanks @andybergon.
+- Calendar: create secondary calendars and get more predictable timezone/day-bound behavior. (#455, #492, #509, #510) — thanks @alexknowshtml, @RaphaelRUzan, and @dinakars777.
+- Auth and agent safety: credential cleanup, Google Ads auth, keyring namespace overrides, command denylists, and safer send-operation controls. (#473, #264, #463, #218, #173, #454) — thanks @yamagucci, @ufkhan97, @mkurz, @EricYangTL, @spookyuser, and @veteranbv.
+
 ### Added
-- Auth: add `auth credentials remove` to delete stored OAuth client credentials and associated refresh tokens. (#473) — thanks @yamagucci.
-- Drive: convert Markdown uploads to Google Docs and strip leading YAML frontmatter by default, with `--keep-frontmatter` to opt out. (#487) — thanks @johnbenjaminlewis.
-- Slides: add `slides thumbnail` / `slides thumb` to fetch rendered slide thumbnail URLs or download PNG/JPEG images. (#498) — thanks @gianpaj.
-- Calendar: add `calendar create-calendar` / `new-calendar` to create secondary calendars with description, timezone, and location. (#455) — thanks @alexknowshtml.
+- Gmail: add `--gmail-no-send`, `GOG_GMAIL_NO_SEND`, `gmail_no_send`, and per-account `config no-send` guards for blocking send operations. (#454) — thanks @veteranbv.
 - Gmail: add `gmail forward` / `gmail fwd` to forward a message with optional note, verified send-as alias, and original attachments. (#482) — thanks @spencer-c-reed.
-- Gmail: add `gmail labels style` to update user label colors and list/message visibility. (#457) — thanks @iskw9973.
-- Contacts: add `--gender` to `contacts create` and `contacts update`, and include gender in `contacts get` text output. (#438) — thanks @klodr.
-- Gmail: add `gmail autoreply` to reply once to matching messages, label the thread for dedupe, and optionally archive/mark read. Includes docs and regression coverage for skip/reply flows.
+- Gmail: add `gmail autoreply` to reply once to matching messages, label the thread for dedupe, and optionally archive/mark read.
 - Gmail: add `gmail messages search --full` to print complete message bodies instead of truncating text output. (#447) — thanks @GodsBoy.
+- Gmail: add `gmail labels style` to update user label colors and list/message visibility. (#457) — thanks @iskw9973.
+- Drive: convert Markdown uploads to Google Docs and strip leading YAML frontmatter by default, with `--keep-frontmatter` to opt out. (#487) — thanks @johnbenjaminlewis.
 - Drive: allow `drive share --role commenter` for comment-only sharing. (#443) — thanks @pavelzak.
 - Drive: show owner email in `drive ls` and `drive search` table output. (#458) — thanks @laihenyi.
+- Slides: add `slides thumbnail` / `slides thumb` to fetch rendered slide thumbnail URLs or download PNG/JPEG images. (#498) — thanks @gianpaj.
+- Sheets: add `sheets chart` to list, inspect, create, update, and delete embedded charts. (#434) — thanks @andybergon.
+- Sheets: add `add-sheet`, `rename-sheet`, and `delete-sheet` tab aliases plus `sheets add-tab --index`. (#442) — thanks @alexknowshtml.
+- Calendar: add `calendar create-calendar` / `new-calendar` to create secondary calendars with description, timezone, and location. (#455) — thanks @alexknowshtml.
+- Auth: add `auth credentials remove` to delete stored OAuth client credentials and associated refresh tokens. (#473) — thanks @yamagucci.
 - Auth: add `ads` as an auth service for Google Ads API tokens. (#264) — thanks @ufkhan97.
 - Secrets: allow `GOG_KEYRING_SERVICE_NAME` to override the keyring namespace. (#463) — thanks @mkurz.
-- Sheets: add `add-sheet`, `rename-sheet`, and `delete-sheet` tab aliases plus `sheets add-tab --index`. (#442) — thanks @alexknowshtml.
-- Sheets: add `sheets chart` to list, inspect, create, update, and delete embedded charts. (#434) — thanks @andybergon.
-- Chat: make `chat spaces find` use case-insensitive substring matching by default, with `--exact` for legacy exact lookup. (#506) — thanks @mvanhorn.
 - Agent safety: allow dotted command paths in `--enable-commands` and add `--disable-commands` / `GOG_DISABLE_COMMANDS` denylist support. (#218, #173) — thanks @EricYangTL and @spookyuser.
-- Gmail: add `--gmail-no-send`, `GOG_GMAIL_NO_SEND`, `gmail_no_send`, and per-account `config no-send` guards for blocking send operations. (#454) — thanks @veteranbv.
+- Contacts: add `--gender` to `contacts create` and `contacts update`, and include gender in `contacts get` text output. (#438) — thanks @klodr.
+- Chat: make `chat spaces find` use case-insensitive substring matching by default, with `--exact` for legacy exact lookup. (#506) — thanks @mvanhorn.
 
 ### Fixed
+- Calendar: avoid ambiguous timezone guessing from offset-only event times, preserve timezones for focus-time events, and use exclusive next-midnight bounds for full-day ranges. (#492, #509, #510) — thanks @RaphaelRUzan and @dinakars777.
+- Gmail: preserve sent and received body content by using quoted-printable plain text, non-`7bit` non-ASCII HTML, and safer UTF-8 charset handling. (#476, #477, #511) — thanks @shashankkr9, @yeager, and @dinakars777.
+- Docs: restore `docs write --replace --markdown` conversion and preserve sed formatting ranges, UTF-16 offsets, and `&` whole-match replacements. (#501, #483) — thanks @twilsher and @bill492.
 - Sheets: preserve valid chart ranges that target sheet ID 0 while still remapping sample-style zero IDs when the spreadsheet has no zero-ID sheet. (#434) — thanks @andybergon.
-- Gmail: avoid declaring non-ASCII HTML send bodies as `7bit` MIME content. (#477) — thanks @yeager.
+- Auth: remove stale aliases and account-client mappings from config when `auth remove` deletes an account. (#467) — thanks @mvanhorn.
+- Contacts: reject all individual update flags when `contacts update --from-file` is used. (#439) — thanks @klodr.
+- Tasks: clear task due dates when `tasks update --due=` is provided. (#507) — thanks @dinakars777.
 - CLI: generate native zsh completions without relying on `bashcompinit`. (#481) — thanks @piiq.
 - Windows: expand `~\...` paths and run the integration live-test wrapper through PowerShell. (#452) — thanks @gagradebnath.
 - Tracking: prefer file-stored tracking secrets over stale keyring values unless keyring storage is configured. (#469) — thanks @alexuser.
-- Docs: restore `docs write --replace --markdown` by uploading Markdown through Drive so Google Docs converts formatting. (#501) — thanks @twilsher.
-- Calendar: avoid ambiguous timezone guessing from offset-only event times, preserve timezones for focus-time events, and use exclusive next-midnight bounds for full-day ranges. (#492, #509, #510) — thanks @RaphaelRUzan and @dinakars777.
-- Gmail: avoid re-decoding Gmail-normalized UTF-8 bodies through stale MIME charset headers while preserving ISO-2022-JP decoding. (#511) — thanks @dinakars777.
-- Tasks: clear task due dates when `tasks update --due=` is provided. (#507) — thanks @dinakars777.
-- Docs: use UTF-16 offsets for sed formatting ranges and preserve `&` whole-match replacements. (#483) — thanks @bill492.
-- Gmail: encode plain-text send bodies as quoted-printable so long lines are not hard-wrapped in transit. (#476) — thanks @shashankkr9.
-- Contacts: reject all individual update flags when `contacts update --from-file` is used. (#439) — thanks @klodr.
-- Auth: remove stale aliases and account-client mappings from config when `auth remove` deletes an account. (#467) — thanks @mvanhorn.
 - Time parsing: accept `tues`, `thur`, and `thurs` as weekday expressions. (#440) — thanks @sjhddh.
 
 ## 0.12.0 - 2026-03-09
