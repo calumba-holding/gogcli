@@ -88,7 +88,7 @@ Implementation: `internal/config/*`.
 ### Refresh tokens (secrets)
 
 - Stored in OS credential store via `github.com/99designs/keyring`.
-- Key namespace is `gogcli` (keyring `ServiceName`).
+- Key namespace is `gogcli` by default (keyring `ServiceName`); override with `GOG_KEYRING_SERVICE_NAME`.
 - Key format: `token:<client>:<email>` (default client uses `token:default:<email>`)
 - Legacy key format: `token:<email>` (migrated on first read)
 - Stored payload is JSON (refresh token + metadata like selected services/scopes).
@@ -142,6 +142,7 @@ Environment:
 - `GOG_CLIENT=work` (select OAuth client bucket; see `--client`)
 - `GOG_KEYRING_PASSWORD=...` (used when keyring falls back to encrypted file backend in non-interactive environments)
 - `GOG_KEYRING_BACKEND={auto|keychain|file}` (force backend; use `file` to avoid Keychain prompts and pair with `GOG_KEYRING_PASSWORD` for non-interactive)
+- `GOG_KEYRING_SERVICE_NAME=...` (override keyring namespace/service name; default `gogcli`)
 - `GOG_TIMEZONE=America/New_York` (default output timezone; IANA name or `UTC`; `local` forces local timezone)
 - `GOG_ENABLE_COMMANDS=calendar,tasks` (optional allowlist of top-level commands)
 - `config.json` can also set `keyring_backend` (JSON5; env vars take precedence)
@@ -160,7 +161,7 @@ Flag aliases:
 - `gog auth credentials <credentials.json|->`
 - `gog auth credentials list`
 - `gog --client <name> auth credentials <credentials.json|->`
-- `gog auth add <email> [--services user|all|gmail,calendar,classroom,drive,docs,contacts,tasks,sheets,people,groups] [--readonly] [--drive-scope full|readonly|file] [--gmail-scope full|readonly] [--extra-scopes CSV] [--manual] [--remote] [--step 1|2] [--auth-url URL] [--listen-addr HOST[:PORT]] [--redirect-host HOST] [--timeout DURATION] [--force-consent]`
+- `gog auth add <email> [--services user|all|gmail,calendar,chat,classroom,drive,docs,slides,contacts,tasks,sheets,people,forms,appscript,ads,groups,keep,admin] [--readonly] [--drive-scope full|readonly|file] [--gmail-scope full|readonly] [--extra-scopes CSV] [--manual] [--remote] [--step 1|2] [--auth-url URL] [--listen-addr HOST[:PORT]] [--redirect-host HOST] [--timeout DURATION] [--force-consent]`
 - `gog auth services [--markdown]`
 - `gog auth manage [--services ...] [--listen-addr HOST[:PORT]] [--redirect-host HOST]`
 - `gog auth keep <email> --key <service-account.json>` (Google Keep; Workspace only)
