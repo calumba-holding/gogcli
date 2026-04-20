@@ -124,8 +124,9 @@ func (c *ChatSpacesListCmd) Run(ctx context.Context, flags *RootFlags) error {
 }
 
 type ChatSpacesFindCmd struct {
-	DisplayName string `arg:"" name:"displayName" help:"Space display name"`
+	DisplayName string `arg:"" name:"displayName" help:"Space display name (substring match, case-insensitive)"`
 	Max         int64  `name:"max" aliases:"limit" help:"Max results per page" default:"100"`
+	Exact       bool   `name:"exact" help:"Require an exact, case-insensitive match on displayName instead of substring match"`
 }
 
 func (c *ChatSpacesFindCmd) Run(ctx context.Context, flags *RootFlags) error {
@@ -148,6 +149,7 @@ func (c *ChatSpacesFindCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return err
 	}
 
+	needle := strings.ToLower(displayName)
 	fetch := func(pageToken string) ([]*chat.Space, string, error) {
 		call := svc.Spaces.List().PageSize(c.Max).Context(ctx)
 		if strings.TrimSpace(pageToken) != "" {
@@ -162,7 +164,13 @@ func (c *ChatSpacesFindCmd) Run(ctx context.Context, flags *RootFlags) error {
 			if space == nil {
 				continue
 			}
-			if strings.EqualFold(space.DisplayName, displayName) {
+			if c.Exact {
+				if strings.EqualFold(space.DisplayName, displayName) {
+					matches = append(matches, space)
+				}
+				continue
+			}
+			if strings.Contains(strings.ToLower(space.DisplayName), needle) {
 				matches = append(matches, space)
 			}
 		}
