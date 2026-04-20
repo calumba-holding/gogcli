@@ -156,6 +156,7 @@ func TestParseWeekdayName(t *testing.T) {
 		t.Run(tc.value, func(t *testing.T) {
 			t.Parallel()
 			got, ok := ParseWeekdayName(tc.value)
+
 			if !ok || got != tc.want {
 				t.Fatalf("ParseWeekdayName(%q) = %v ok=%v, want %v true", tc.value, got, ok, tc.want)
 			}
