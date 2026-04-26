@@ -156,19 +156,35 @@ type DriveDownloadCmd struct {
 	FileID string         `arg:"" name:"fileId" help:"File ID"`
 	Output OutputPathFlag `embed:""`
 	Format string         `name:"format" help:"Export format for Google Docs files: pdf|csv|xlsx|pptx|txt|png|docx|md (default: inferred)"`
+	Tab    string         `name:"tab" help:"(experimental) Export a specific tab by title or ID (Google Docs only; see 'gog docs list-tabs')"`
 }
 
 func (c *DriveDownloadCmd) Run(ctx context.Context, flags *RootFlags) error {
-	u := ui.FromContext(ctx)
 	account, err := requireAccount(flags)
 	if err != nil {
 		return err
 	}
 
-	fileID := strings.TrimSpace(c.FileID)
+	fileID := normalizeGoogleID(strings.TrimSpace(c.FileID))
 	if fileID == "" {
 		return usage("empty fileId")
 	}
+
+	if tab := strings.TrimSpace(c.Tab); tab != "" {
+		if f := c.Format; f != "" && f != formatAuto {
+			if _, fmtErr := tabExportFormatParam(f); fmtErr != nil {
+				return fmt.Errorf("--tab limits export formats (pdf|docx|txt|md|html); %q is not supported with --tab", f)
+			}
+		}
+		return runDocsTabExport(ctx, flags, tabExportParams{
+			DocID:    fileID,
+			OutFlag:  c.Output.Path,
+			Format:   c.Format,
+			TabQuery: tab,
+		})
+	}
+
+	u := ui.FromContext(ctx)
 	if formatErr := validateDriveDownloadFormatFlag(c.Format); formatErr != nil {
 		return formatErr
 	}

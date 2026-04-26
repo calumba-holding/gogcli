@@ -18,7 +18,7 @@ import (
 var newDocsService = googleapi.NewDocs
 
 type DocsCmd struct {
-	Export      DocsExportCmd      `cmd:"" name:"export" aliases:"download,dl" help:"Export a Google Doc (pdf|docx|txt|md)"`
+	Export      DocsExportCmd      `cmd:"" name:"export" aliases:"download,dl" help:"Export a Google Doc (pdf|docx|txt|md|html)"`
 	Info        DocsInfoCmd        `cmd:"" name:"info" aliases:"get,show" help:"Get Google Doc metadata"`
 	Create      DocsCreateCmd      `cmd:"" name:"create" aliases:"add,new" help:"Create a Google Doc"`
 	Copy        DocsCopyCmd        `cmd:"" name:"copy" aliases:"cp,duplicate" help:"Copy a Google Doc"`
@@ -40,9 +40,18 @@ type DocsExportCmd struct {
 	DocID  string         `arg:"" name:"docId" help:"Doc ID"`
 	Output OutputPathFlag `embed:""`
 	Format string         `name:"format" help:"Export format: pdf|docx|txt|md|html" default:"pdf"`
+	Tab    string         `name:"tab" help:"(experimental) Export a specific tab by title or ID (see 'gog docs list-tabs')"`
 }
 
 func (c *DocsExportCmd) Run(ctx context.Context, flags *RootFlags) error {
+	if tab := strings.TrimSpace(c.Tab); tab != "" {
+		return runDocsTabExport(ctx, flags, tabExportParams{
+			DocID:    c.DocID,
+			OutFlag:  c.Output.Path,
+			Format:   c.Format,
+			TabQuery: tab,
+		})
+	}
 	return exportViaDrive(ctx, flags, exportViaDriveOptions{
 		ArgName:       "docId",
 		ExpectedMime:  "application/vnd.google-apps.document",
