@@ -39,7 +39,7 @@ func loadDocsTargetDocument(ctx context.Context, svc *docs.Service, docID, tabID
 		return &docsLoadedTarget{full: doc, target: doc}, nil
 	}
 
-	tab := findTabByID(flattenTabs(doc.Tabs), tabID)
+	tab := findTab(flattenTabs(doc.Tabs), tabID)
 	if tab == nil {
 		return nil, fmt.Errorf("tab not found: %s", tabID)
 	}

@@ -152,7 +152,7 @@ func docsTargetEndIndex(ctx context.Context, svc *docs.Service, docID, tabID str
 		return docsDocumentEndIndex(doc), nil
 	}
 
-	tab := findTabByID(flattenTabs(doc.Tabs), tabID)
+	tab := findTab(flattenTabs(doc.Tabs), tabID)
 	if tab == nil {
 		return 0, fmt.Errorf("tab not found: %s", tabID)
 	}

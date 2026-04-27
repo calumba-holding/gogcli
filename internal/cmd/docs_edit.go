@@ -15,6 +15,23 @@ import (
 	"github.com/steipete/gogcli/internal/ui"
 )
 
+// resolveTabArg returns the effective tab value from --tab or the deprecated
+// --tab-id flag. It rejects supplying both and emits a deprecation warning
+// when --tab-id is used.
+func resolveTabArg(ctx context.Context, tab, tabID string) (string, error) {
+	tab = strings.TrimSpace(tab)
+	tabID = strings.TrimSpace(tabID)
+	if tab != "" && tabID != "" {
+		return "", usage("--tab and --tab-id are mutually exclusive (--tab-id is deprecated; use --tab)")
+	}
+	if tabID != "" {
+		u := ui.FromContext(ctx)
+		u.Err().Printf("Warning: --tab-id is deprecated; use --tab instead")
+		return tabID, nil
+	}
+	return tab, nil
+}
+
 type DocsWriteCmd struct {
 	DocID    string `arg:"" name:"docId" help:"Doc ID"`
 	Text     string `name:"text" help:"Text to write"`
@@ -23,7 +40,8 @@ type DocsWriteCmd struct {
 	Markdown bool   `name:"markdown" help:"Convert markdown to Google Docs formatting (requires --replace)"`
 	Append   bool   `name:"append" help:"Append instead of replacing the document body"`
 	Pageless bool   `name:"pageless" help:"Set document to pageless mode"`
-	TabID    string `name:"tab-id" help:"Target a specific tab by ID (see docs list-tabs)"`
+	Tab      string `name:"tab" help:"Target a specific tab by title or ID (see docs list-tabs)"`
+	TabID    string `name:"tab-id" hidden:"" help:"(deprecated) Use --tab"`
 }
 
 func (c *DocsWriteCmd) Run(ctx context.Context, kctx *kong.Context, flags *RootFlags) error {
@@ -39,6 +57,13 @@ func (c *DocsWriteCmd) Run(ctx context.Context, kctx *kong.Context, flags *RootF
 	if c.Append && c.Replace {
 		return usage("--append cannot be combined with --replace")
 	}
+
+	tab, tabErr := resolveTabArg(ctx, c.Tab, c.TabID)
+	if tabErr != nil {
+		return tabErr
+	}
+	c.Tab = tab
+
 	if c.Markdown {
 		return c.writeMarkdown(ctx, flags, id, text)
 	}
@@ -66,7 +91,7 @@ func (c *DocsWriteCmd) writePlainText(ctx context.Context, flags *RootFlags, doc
 		return err
 	}
 
-	endIndex, err := docsTargetEndIndex(ctx, svc, docID, c.TabID)
+	endIndex, err := docsTargetEndIndex(ctx, svc, docID, c.Tab)
 	if err != nil {
 		return err
 	}
@@ -97,14 +122,14 @@ func (c *DocsWriteCmd) buildPlainWriteRequests(endIndex, insertIndex int64, text
 		if deleteEnd > 1 {
 			reqs = append(reqs, &docs.Request{
 				DeleteContentRange: &docs.DeleteContentRangeRequest{
-					Range: &docs.Range{StartIndex: 1, EndIndex: deleteEnd, TabId: c.TabID},
+					Range: &docs.Range{StartIndex: 1, EndIndex: deleteEnd, TabId: c.Tab},
 				},
 			})
 		}
 	}
 	reqs = append(reqs, &docs.Request{
 		InsertText: &docs.InsertTextRequest{
-			Location: &docs.Location{Index: insertIndex, TabId: c.TabID},
+			Location: &docs.Location{Index: insertIndex, TabId: c.Tab},
 			Text:     text,
 		},
 	})
@@ -130,8 +155,8 @@ func (c *DocsWriteCmd) writePlainTextResult(ctx context.Context, resp *docs.Batc
 			"append":     c.Append,
 			"index":      insertIndex,
 		}
-		if c.TabID != "" {
-			payload["tabId"] = c.TabID
+		if c.Tab != "" {
+			payload["tabId"] = c.Tab
 		}
 		if resp.WriteControl != nil {
 			payload["writeControl"] = resp.WriteControl
@@ -143,8 +168,8 @@ func (c *DocsWriteCmd) writePlainTextResult(ctx context.Context, resp *docs.Batc
 	u.Out().Printf("requests\t%d", requestCount)
 	u.Out().Printf("append\t%t", c.Append)
 	u.Out().Printf("index\t%d", insertIndex)
-	if c.TabID != "" {
-		u.Out().Printf("tabId\t%s", c.TabID)
+	if c.Tab != "" {
+		u.Out().Printf("tabId\t%s", c.Tab)
 	}
 	if resp.WriteControl != nil && resp.WriteControl.RequiredRevisionId != "" {
 		u.Out().Printf("revision\t%s", resp.WriteControl.RequiredRevisionId)
@@ -161,8 +186,8 @@ func (c *DocsWriteCmd) writeMarkdown(ctx context.Context, flags *RootFlags, docI
 	if c.Append {
 		return usage("--markdown cannot be combined with --append")
 	}
-	if c.TabID != "" {
-		return usage("--markdown cannot be combined with --tab-id")
+	if c.Tab != "" {
+		return usage("--markdown cannot be combined with --tab")
 	}
 
 	cleaned, images := extractMarkdownImages(content)
@@ -233,7 +258,8 @@ type DocsUpdateCmd struct {
 	File     string `name:"file" help:"Text file path ('-' for stdin)"`
 	Index    int64  `name:"index" help:"Insert index (default: end of document)"`
 	Pageless bool   `name:"pageless" help:"Set document to pageless mode"`
-	TabID    string `name:"tab-id" help:"Target a specific tab by ID (see docs list-tabs)"`
+	Tab      string `name:"tab" help:"Target a specific tab by title or ID (see docs list-tabs)"`
+	TabID    string `name:"tab-id" hidden:"" help:"(deprecated) Use --tab"`
 }
 
 func (c *DocsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *RootFlags) error {
@@ -257,6 +283,12 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *Root
 		return usage("invalid --index (must be >= 1)")
 	}
 
+	tab, tabErr := resolveTabArg(ctx, c.Tab, c.TabID)
+	if tabErr != nil {
+		return tabErr
+	}
+	c.Tab = tab
+
 	svc, err := requireDocsService(ctx, flags)
 	if err != nil {
 		return err
@@ -264,7 +296,7 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *Root
 
 	insertIndex := c.Index
 	if insertIndex <= 0 {
-		endIndex, endErr := docsTargetEndIndex(ctx, svc, id, c.TabID)
+		endIndex, endErr := docsTargetEndIndex(ctx, svc, id, c.Tab)
 		if endErr != nil {
 			return endErr
 		}
@@ -273,7 +305,7 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *Root
 
 	reqs := []*docs.Request{{
 		InsertText: &docs.InsertTextRequest{
-			Location: &docs.Location{Index: insertIndex, TabId: c.TabID},
+			Location: &docs.Location{Index: insertIndex, TabId: c.Tab},
 			Text:     text,
 		},
 	}}
@@ -297,8 +329,8 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *Root
 			"requests":   len(reqs),
 			"index":      insertIndex,
 		}
-		if c.TabID != "" {
-			payload["tabId"] = c.TabID
+		if c.Tab != "" {
+			payload["tabId"] = c.Tab
 		}
 		if resp.WriteControl != nil {
 			payload["writeControl"] = resp.WriteControl
@@ -309,8 +341,8 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *Root
 	u.Out().Printf("id\t%s", resp.DocumentId)
 	u.Out().Printf("requests\t%d", len(reqs))
 	u.Out().Printf("index\t%d", insertIndex)
-	if c.TabID != "" {
-		u.Out().Printf("tabId\t%s", c.TabID)
+	if c.Tab != "" {
+		u.Out().Printf("tabId\t%s", c.Tab)
 	}
 	if resp.WriteControl != nil && resp.WriteControl.RequiredRevisionId != "" {
 		u.Out().Printf("revision\t%s", resp.WriteControl.RequiredRevisionId)
@@ -323,7 +355,8 @@ type DocsInsertCmd struct {
 	Content string `arg:"" optional:"" name:"content" help:"Text to insert (or use --file / stdin)"`
 	Index   int64  `name:"index" help:"Character index to insert at (1 = beginning)" default:"1"`
 	File    string `name:"file" short:"f" help:"Read content from file (use - for stdin)"`
-	TabID   string `name:"tab-id" help:"Target a specific tab by ID (see docs list-tabs)"`
+	Tab     string `name:"tab" help:"Target a specific tab by title or ID (see docs list-tabs)"`
+	TabID   string `name:"tab-id" hidden:"" help:"(deprecated) Use --tab"`
 }
 
 func (c *DocsInsertCmd) Run(ctx context.Context, flags *RootFlags) error {
@@ -343,6 +376,12 @@ func (c *DocsInsertCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return usage("--index must be >= 1 (index 0 is reserved)")
 	}
 
+	tab, tabErr := resolveTabArg(ctx, c.Tab, c.TabID)
+	if tabErr != nil {
+		return tabErr
+	}
+	c.Tab = tab
+
 	svc, err := requireDocsService(ctx, flags)
 	if err != nil {
 		return err
@@ -354,7 +393,7 @@ func (c *DocsInsertCmd) Run(ctx context.Context, flags *RootFlags) error {
 				Text: content,
 				Location: &docs.Location{
 					Index: c.Index,
-					TabId: c.TabID,
+					TabId: c.Tab,
 				},
 			},
 		}},
@@ -365,8 +404,8 @@ func (c *DocsInsertCmd) Run(ctx context.Context, flags *RootFlags) error {
 
 	if outfmt.IsJSON(ctx) {
 		payload := map[string]any{"documentId": result.DocumentId, "inserted": len(content), "atIndex": c.Index}
-		if c.TabID != "" {
-			payload["tabId"] = c.TabID
+		if c.Tab != "" {
+			payload["tabId"] = c.Tab
 		}
 		return outfmt.WriteJSON(ctx, os.Stdout, payload)
 	}
@@ -374,8 +413,8 @@ func (c *DocsInsertCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u.Out().Printf("documentId\t%s", result.DocumentId)
 	u.Out().Printf("inserted\t%d bytes", len(content))
 	u.Out().Printf("atIndex\t%d", c.Index)
-	if c.TabID != "" {
-		u.Out().Printf("tabId\t%s", c.TabID)
+	if c.Tab != "" {
+		u.Out().Printf("tabId\t%s", c.Tab)
 	}
 	return nil
 }
@@ -384,7 +423,8 @@ type DocsDeleteCmd struct {
 	DocID string `arg:"" name:"docId" help:"Doc ID"`
 	Start int64  `name:"start" required:"" help:"Start index (>= 1)"`
 	End   int64  `name:"end" required:"" help:"End index (> start)"`
-	TabID string `name:"tab-id" help:"Target a specific tab by ID (see docs list-tabs)"`
+	Tab   string `name:"tab" help:"Target a specific tab by title or ID (see docs list-tabs)"`
+	TabID string `name:"tab-id" hidden:"" help:"(deprecated) Use --tab"`
 }
 
 func (c *DocsDeleteCmd) Run(ctx context.Context, flags *RootFlags) error {
@@ -400,6 +440,12 @@ func (c *DocsDeleteCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return usage("--end must be greater than --start")
 	}
 
+	tab, tabErr := resolveTabArg(ctx, c.Tab, c.TabID)
+	if tabErr != nil {
+		return tabErr
+	}
+	c.Tab = tab
+
 	svc, err := requireDocsService(ctx, flags)
 	if err != nil {
 		return err
@@ -408,7 +454,7 @@ func (c *DocsDeleteCmd) Run(ctx context.Context, flags *RootFlags) error {
 	result, err := svc.Documents.BatchUpdate(docID, &docs.BatchUpdateDocumentRequest{
 		Requests: []*docs.Request{{
 			DeleteContentRange: &docs.DeleteContentRangeRequest{
-				Range: &docs.Range{StartIndex: c.Start, EndIndex: c.End, TabId: c.TabID},
+				Range: &docs.Range{StartIndex: c.Start, EndIndex: c.End, TabId: c.Tab},
 			},
 		}},
 	}).Context(ctx).Do()
@@ -423,8 +469,8 @@ func (c *DocsDeleteCmd) Run(ctx context.Context, flags *RootFlags) error {
 			"startIndex": c.Start,
 			"endIndex":   c.End,
 		}
-		if c.TabID != "" {
-			payload["tabId"] = c.TabID
+		if c.Tab != "" {
+			payload["tabId"] = c.Tab
 		}
 		return outfmt.WriteJSON(ctx, os.Stdout, payload)
 	}
@@ -432,8 +478,8 @@ func (c *DocsDeleteCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u.Out().Printf("documentId\t%s", result.DocumentId)
 	u.Out().Printf("deleted\t%d characters", c.End-c.Start)
 	u.Out().Printf("range\t%d-%d", c.Start, c.End)
-	if c.TabID != "" {
-		u.Out().Printf("tabId\t%s", c.TabID)
+	if c.Tab != "" {
+		u.Out().Printf("tabId\t%s", c.Tab)
 	}
 	return nil
 }
@@ -458,7 +504,8 @@ type DocsFindReplaceCmd struct {
 	MatchCase   bool   `name:"match-case" help:"Case-sensitive matching"`
 	Format      string `name:"format" help:"Replacement format: plain|markdown. Markdown converts formatting, tables, and inline images from public HTTPS URLs." default:"plain" enum:"plain,markdown"`
 	First       bool   `name:"first" help:"Replace only the first occurrence instead of all."`
-	TabID       string `name:"tab-id" help:"Target a specific tab by ID (see docs list-tabs)"`
+	Tab         string `name:"tab" help:"Target a specific tab by title or ID (see docs list-tabs)"`
+	TabID       string `name:"tab-id" hidden:"" help:"(deprecated) Use --tab"`
 }
 
 type DocsEditCmd struct {
@@ -496,8 +543,15 @@ func (c *DocsFindReplaceCmd) Run(ctx context.Context, flags *RootFlags) error {
 	if format == "" {
 		format = docsContentFormatPlain
 	}
-	if c.TabID != "" && format == docsContentFormatMarkdown {
-		return usage("--tab-id is not yet supported with --format markdown")
+
+	tab, tabErr := resolveTabArg(ctx, c.Tab, c.TabID)
+	if tabErr != nil {
+		return tabErr
+	}
+	c.Tab = tab
+
+	if c.Tab != "" && format == docsContentFormatMarkdown {
+		return usage("--tab is not yet supported with --format markdown")
 	}
 
 	svc, err := requireDocsService(ctx, flags)
@@ -509,7 +563,7 @@ func (c *DocsFindReplaceCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return c.runReplaceAll(ctx, u, svc, docID, replaceText)
 	}
 
-	loaded, err := loadDocsTargetDocument(ctx, svc, docID, c.TabID)
+	loaded, err := loadDocsTargetDocument(ctx, svc, docID, c.Tab)
 	if err != nil {
 		return err
 	}
@@ -540,7 +594,7 @@ func (c *DocsFindReplaceCmd) Run(ctx context.Context, flags *RootFlags) error {
 		if i == 0 {
 			continue
 		}
-		loaded, err = loadDocsTargetDocument(ctx, svc, docID, c.TabID)
+		loaded, err = loadDocsTargetDocument(ctx, svc, docID, c.Tab)
 		if err != nil {
 			return fmt.Errorf("re-reading document: %w", err)
 		}
@@ -554,8 +608,8 @@ func (c *DocsFindReplaceCmd) Run(ctx context.Context, flags *RootFlags) error {
 			"replace":      replaceText,
 			"replacements": len(matches),
 		}
-		if c.TabID != "" {
-			payload["tabId"] = c.TabID
+		if c.Tab != "" {
+			payload["tabId"] = c.Tab
 		}
 		return outfmt.WriteJSON(ctx, os.Stdout, payload)
 	}
@@ -564,14 +618,14 @@ func (c *DocsFindReplaceCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u.Out().Printf("find\t%s", c.Find)
 	u.Out().Printf("replace\t%s", replaceText)
 	u.Out().Printf("replacements\t%d", len(matches))
-	if c.TabID != "" {
-		u.Out().Printf("tabId\t%s", c.TabID)
+	if c.Tab != "" {
+		u.Out().Printf("tabId\t%s", c.Tab)
 	}
 	return nil
 }
 
 func (c *DocsFindReplaceCmd) runReplaceAll(ctx context.Context, u *ui.UI, svc *docs.Service, docID, replaceText string) error {
-	documentID, replacements, err := runDocsReplaceAll(ctx, svc, docID, c.Find, replaceText, c.MatchCase, c.TabID)
+	documentID, replacements, err := runDocsReplaceAll(ctx, svc, docID, c.Find, replaceText, c.MatchCase, c.Tab)
 	if err != nil {
 		return err
 	}
@@ -583,8 +637,8 @@ func (c *DocsFindReplaceCmd) runReplaceAll(ctx context.Context, u *ui.UI, svc *d
 			"replace":      replaceText,
 			"replacements": replacements,
 		}
-		if c.TabID != "" {
-			payload["tabId"] = c.TabID
+		if c.Tab != "" {
+			payload["tabId"] = c.Tab
 		}
 		return outfmt.WriteJSON(ctx, os.Stdout, payload)
 	}
@@ -593,14 +647,14 @@ func (c *DocsFindReplaceCmd) runReplaceAll(ctx context.Context, u *ui.UI, svc *d
 	u.Out().Printf("find\t%s", c.Find)
 	u.Out().Printf("replace\t%s", replaceText)
 	u.Out().Printf("replacements\t%d", replacements)
-	if c.TabID != "" {
-		u.Out().Printf("tabId\t%s", c.TabID)
+	if c.Tab != "" {
+		u.Out().Printf("tabId\t%s", c.Tab)
 	}
 	return nil
 }
 
 func (c *DocsFindReplaceCmd) runPlain(ctx context.Context, svc *docs.Service, doc *docs.Document, startIdx, endIdx int64, replaceText string) error {
-	return replaceDocsTextRange(ctx, svc, doc, startIdx, endIdx, replaceText, c.TabID)
+	return replaceDocsTextRange(ctx, svc, doc, startIdx, endIdx, replaceText, c.Tab)
 }
 
 func (c *DocsFindReplaceCmd) runMarkdown(ctx context.Context, svc *docs.Service, doc *docs.Document, startIdx, endIdx int64, replaceText string) error {
@@ -615,8 +669,8 @@ func (c *DocsFindReplaceCmd) printFirstResult(ctx context.Context, u *ui.UI, doc
 			"replacements": replacements,
 			"remaining":    total - replacements,
 		}
-		if c.TabID != "" {
-			payload["tabId"] = c.TabID
+		if c.Tab != "" {
+			payload["tabId"] = c.Tab
 		}
 		return outfmt.WriteJSON(ctx, os.Stdout, payload)
 	}
@@ -628,8 +682,8 @@ func (c *DocsFindReplaceCmd) printFirstResult(ctx context.Context, u *ui.UI, doc
 	if remaining := total - replacements; remaining > 0 {
 		u.Out().Printf("remaining\t%d", remaining)
 	}
-	if c.TabID != "" {
-		u.Out().Printf("tabId\t%s", c.TabID)
+	if c.Tab != "" {
+		u.Out().Printf("tabId\t%s", c.Tab)
 	}
 	return nil
 }
