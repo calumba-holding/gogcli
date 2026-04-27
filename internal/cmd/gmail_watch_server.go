@@ -302,7 +302,7 @@ func (s *gmailWatchServer) fetchMessages(ctx context.Context, svc *gmail.Service
 		}
 		msg, err := svc.Users.Messages.Get("me", id).
 			Format(format).
-			MetadataHeaders("From", "To", "Subject", "Date").
+			MetadataHeaders(gmailBasicMetadataHeaders...).
 			Context(ctx).
 			Do()
 		if err != nil {

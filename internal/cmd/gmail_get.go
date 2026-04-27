@@ -54,12 +54,8 @@ func (c *GmailGetCmd) Run(ctx context.Context, flags *RootFlags) error {
 	if format == gmailFormatMetadata {
 		headerList := splitCSV(c.Headers)
 		if len(headerList) == 0 {
-			headerList = []string{
-				"From", "To", "Cc", "Bcc", "Subject", "Date",
-				"Message-ID", "In-Reply-To", "References",
-			}
-		}
-		if !hasHeaderName(headerList, "List-Unsubscribe") {
+			headerList = defaultGmailGetMetadataHeaders()
+		} else if !hasHeaderName(headerList, "List-Unsubscribe") {
 			headerList = append(headerList, "List-Unsubscribe")
 		}
 		call = call.MetadataHeaders(headerList...)

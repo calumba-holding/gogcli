@@ -264,7 +264,7 @@ func fetchMessageDetails(ctx context.Context, svc *gmail.Service, messages []*gm
 				call = call.Format("full")
 			} else {
 				call = call.Format("metadata").
-					MetadataHeaders("From", "Subject", "Date").
+					MetadataHeaders(gmailMessageSummaryMetadataHeaders...).
 					Fields("id,threadId,labelIds,payload(headers)")
 			}
 			msg, err := call.Context(ctx).Do()
