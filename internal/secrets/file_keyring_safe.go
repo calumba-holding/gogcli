@@ -3,6 +3,7 @@ package secrets
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io/fs"
 	"sort"
 	"strings"
@@ -61,8 +62,9 @@ func (k *fileSafeKeyring) Get(key string) (keyring.Item, error) {
 		item.Key = key
 		return item, nil
 	}
+
 	if !fileKeyNotFound(err) {
-		return keyring.Item{}, err
+		return keyring.Item{}, fmt.Errorf("read encoded file keyring item: %w", err)
 	}
 
 	item, legacyErr := k.inner.Get(key)
@@ -70,10 +72,12 @@ func (k *fileSafeKeyring) Get(key string) (keyring.Item, error) {
 		if fileKeyNotFound(legacyErr) {
 			return keyring.Item{}, keyring.ErrKeyNotFound
 		}
-		return keyring.Item{}, legacyErr
+
+		return keyring.Item{}, fmt.Errorf("read legacy file keyring item: %w", legacyErr)
 	}
 
 	item.Key = key
+
 	return item, nil
 }
 
@@ -82,8 +86,9 @@ func (k *fileSafeKeyring) GetMetadata(key string) (keyring.Metadata, error) {
 	if err == nil {
 		return meta, nil
 	}
+
 	if !fileKeyNotFound(err) {
-		return keyring.Metadata{}, err
+		return keyring.Metadata{}, fmt.Errorf("read encoded file keyring metadata: %w", err)
 	}
 
 	meta, legacyErr := k.inner.GetMetadata(key)
@@ -91,7 +96,8 @@ func (k *fileSafeKeyring) GetMetadata(key string) (keyring.Metadata, error) {
 		if fileKeyNotFound(legacyErr) {
 			return keyring.Metadata{}, keyring.ErrKeyNotFound
 		}
-		return keyring.Metadata{}, legacyErr
+
+		return keyring.Metadata{}, fmt.Errorf("read legacy file keyring metadata: %w", legacyErr)
 	}
 
 	return meta, nil
@@ -99,7 +105,11 @@ func (k *fileSafeKeyring) GetMetadata(key string) (keyring.Metadata, error) {
 
 func (k *fileSafeKeyring) Set(item keyring.Item) error {
 	item.Key = fileSafeKey(item.Key)
-	return k.inner.Set(item)
+	if err := k.inner.Set(item); err != nil {
+		return fmt.Errorf("store file keyring item: %w", err)
+	}
+
+	return nil
 }
 
 func (k *fileSafeKeyring) Remove(key string) error {
@@ -109,22 +119,26 @@ func (k *fileSafeKeyring) Remove(key string) error {
 	if encodedErr == nil || legacyErr == nil {
 		return nil
 	}
+
 	if fileKeyNotFound(encodedErr) && fileKeyNotFound(legacyErr) {
 		return keyring.ErrKeyNotFound
 	}
+
 	if !fileKeyNotFound(encodedErr) {
-		return encodedErr
+		return fmt.Errorf("remove encoded file keyring item: %w", encodedErr)
 	}
-	return legacyErr
+
+	return fmt.Errorf("remove legacy file keyring item: %w", legacyErr)
 }
 
 func (k *fileSafeKeyring) Keys() ([]string, error) {
 	keys, err := k.inner.Keys()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list file keyring keys: %w", err)
 	}
 
 	out := make([]string, 0, len(keys))
+
 	seen := make(map[string]struct{}, len(keys))
 	for _, key := range keys {
 		decoded := decodeFileSafeKey(key)
@@ -134,6 +148,7 @@ func (k *fileSafeKeyring) Keys() ([]string, error) {
 		seen[decoded] = struct{}{}
 		out = append(out, decoded)
 	}
+
 	sort.Strings(out)
 
 	return out, nil

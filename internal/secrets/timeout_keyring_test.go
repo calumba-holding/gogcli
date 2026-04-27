@@ -55,6 +55,7 @@ func TestKeyringTimeoutHint(t *testing.T) {
 
 func TestTimeoutKeyringTimesOutOperations(t *testing.T) {
 	block := make(chan struct{})
+
 	t.Cleanup(func() { close(block) })
 
 	ring := newTimeoutKeyring(&blockingKeyring{block: block}, 10*time.Millisecond, keyringTimeoutHint("darwin"))
@@ -63,6 +64,7 @@ func TestTimeoutKeyringTimesOutOperations(t *testing.T) {
 	if !errors.Is(err, errKeyringTimeout) {
 		t.Fatalf("expected timeout error, got %v", err)
 	}
+
 	if !strings.Contains(err.Error(), "listing keyring items") || !strings.Contains(err.Error(), "Always Allow") {
 		t.Fatalf("expected operation and macOS hint in timeout, got %v", err)
 	}

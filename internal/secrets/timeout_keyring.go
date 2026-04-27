@@ -28,6 +28,7 @@ func withKeyringTimeout[T any](timeout time.Duration, operation string, hint str
 	}
 
 	ch := make(chan result, 1)
+
 	go func() {
 		value, err := fn()
 		ch <- result{value: value, err: err}
@@ -64,6 +65,7 @@ func (k *timeoutKeyring) Set(item keyring.Item) error {
 	_, err := withKeyringTimeout(k.timeout, "storing keyring item", k.hint, func() (struct{}, error) {
 		return struct{}{}, k.inner.Set(item)
 	})
+
 	return err
 }
 
@@ -71,6 +73,7 @@ func (k *timeoutKeyring) Remove(key string) error {
 	_, err := withKeyringTimeout(k.timeout, "removing keyring item", k.hint, func() (struct{}, error) {
 		return struct{}{}, k.inner.Remove(key)
 	})
+
 	return err
 }
 
