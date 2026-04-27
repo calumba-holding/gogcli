@@ -2,7 +2,7 @@ package cmd
 
 var (
 	gmailBasicMetadataHeaders = []string{"From", "To", "Cc", "Bcc", "Subject", "Date"}
-	gmailReplyMetadataHeaders = []string{"Message-ID", "Message-Id", "References", "In-Reply-To", "From", "Reply-To", "To", "Cc", "Date"}
+	gmailReplyMetadataHeaders = []string{"Message-ID", "Message-Id", "References", "In-Reply-To", "From", "Reply-To", "To", "Cc", "Date", "Subject"}
 
 	gmailAutoReplyMetadataHeaders = []string{
 		"Message-ID", "Message-Id", "References", "In-Reply-To",

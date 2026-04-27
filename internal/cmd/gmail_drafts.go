@@ -270,7 +270,9 @@ type draftComposeInput struct {
 }
 
 func (c draftComposeInput) validate() error {
-	if strings.TrimSpace(c.Subject) == "" {
+	if strings.TrimSpace(c.Subject) == "" &&
+		strings.TrimSpace(c.ReplyToMessageID) == "" &&
+		strings.TrimSpace(c.ReplyToThreadID) == "" {
 		return usage("required: --subject")
 	}
 	if strings.TrimSpace(c.Body) == "" && strings.TrimSpace(c.BodyHTML) == "" {
@@ -291,11 +293,15 @@ func buildDraftMessage(ctx context.Context, svc *gmail.Service, account string, 
 	}
 	threadID := info.ThreadID
 	atts := attachmentsFromPaths(input.Attach)
+	subject := input.Subject
+	if strings.TrimSpace(subject) == "" {
+		subject = autoReplySubject("", info.Subject)
+	}
 
 	msg, err := buildGmailMessage(sendMessageOptions{
 		FromAddr:    from.header,
 		ReplyTo:     input.ReplyTo,
-		Subject:     input.Subject,
+		Subject:     subject,
 		Body:        body,
 		BodyHTML:    htmlBody,
 		ReplyInfo:   info,

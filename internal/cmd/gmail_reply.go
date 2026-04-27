@@ -54,6 +54,7 @@ type replyInfo struct {
 	ToAddrs     []string
 	CcAddrs     []string
 	Date        string
+	Subject     string
 	Body        string
 	BodyHTML    string
 }
@@ -140,6 +141,7 @@ func replyInfoFromMessage(msg *gmail.Message, includeQuoteBodies bool) *replyInf
 		ToAddrs:     parseEmailAddresses(headerValue(msg.Payload, "To")),
 		CcAddrs:     parseEmailAddresses(headerValue(msg.Payload, "Cc")),
 		Date:        headerValue(msg.Payload, "Date"),
+		Subject:     headerValue(msg.Payload, "Subject"),
 	}
 
 	if includeQuoteBodies {

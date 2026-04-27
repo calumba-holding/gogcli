@@ -91,6 +91,7 @@ func TestExecute_GmailSend_ReplyToMessageID(t *testing.T) {
 					"headers": []map[string]any{
 						{"name": "Message-ID", "value": "<orig@id>"},
 						{"name": "References", "value": "<ref0>"},
+						{"name": "Subject", "value": "Original Subject"},
 					},
 				},
 			})
@@ -117,6 +118,9 @@ func TestExecute_GmailSend_ReplyToMessageID(t *testing.T) {
 			}
 			if !strings.Contains(s, "References: <ref0> <orig@id>\r\n") {
 				t.Fatalf("missing References in raw:\n%s", s)
+			}
+			if !strings.Contains(s, "Subject: Re: Original Subject\r\n") {
+				t.Fatalf("missing auto reply subject in raw:\n%s", s)
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": "s1", "threadId": "t0"})
@@ -230,7 +234,6 @@ func TestExecute_GmailDraftsCreate_ReplyToMessageID(t *testing.T) {
 				"--account", "a@b.com",
 				"gmail", "drafts", "create",
 				"--to", "x@y.com",
-				"--subject", "S",
 				"--body", "B",
 				"--reply-to-message-id", "m0",
 			}); err != nil {
