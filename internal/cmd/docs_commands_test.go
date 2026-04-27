@@ -608,6 +608,9 @@ func TestDocsCat_TabNotFound(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "tab not found") {
 		t.Fatalf("expected tab not found error, got: %v", err)
 	}
+	if !strings.Contains(err.Error(), "Overview") || !strings.Contains(err.Error(), "Details") {
+		t.Fatalf("expected available tab names in error, got: %v", err)
+	}
 }
 
 func TestDocsCat_SingleTab_JSON(t *testing.T) {
