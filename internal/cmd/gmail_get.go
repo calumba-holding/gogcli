@@ -54,7 +54,10 @@ func (c *GmailGetCmd) Run(ctx context.Context, flags *RootFlags) error {
 	if format == gmailFormatMetadata {
 		headerList := splitCSV(c.Headers)
 		if len(headerList) == 0 {
-			headerList = []string{"From", "To", "Cc", "Bcc", "Subject", "Date"}
+			headerList = []string{
+				"From", "To", "Cc", "Bcc", "Subject", "Date",
+				"Message-ID", "In-Reply-To", "References",
+			}
 		}
 		if !hasHeaderName(headerList, "List-Unsubscribe") {
 			headerList = append(headerList, "List-Unsubscribe")
@@ -72,12 +75,15 @@ func (c *GmailGetCmd) Run(ctx context.Context, flags *RootFlags) error {
 		// Include a flattened headers map for easier querying
 		// (e.g., jq '.headers.to' instead of complex nested queries)
 		headers := map[string]string{
-			"from":    headerValue(msg.Payload, "From"),
-			"to":      headerValue(msg.Payload, "To"),
-			"cc":      headerValue(msg.Payload, "Cc"),
-			"bcc":     headerValue(msg.Payload, "Bcc"),
-			"subject": headerValue(msg.Payload, "Subject"),
-			"date":    headerValue(msg.Payload, "Date"),
+			"from":        headerValue(msg.Payload, "From"),
+			"to":          headerValue(msg.Payload, "To"),
+			"cc":          headerValue(msg.Payload, "Cc"),
+			"bcc":         headerValue(msg.Payload, "Bcc"),
+			"subject":     headerValue(msg.Payload, "Subject"),
+			"date":        headerValue(msg.Payload, "Date"),
+			"message_id":  headerValue(msg.Payload, "Message-ID"),
+			"in_reply_to": headerValue(msg.Payload, "In-Reply-To"),
+			"references":  headerValue(msg.Payload, "References"),
 		}
 		payload := map[string]any{
 			"message": msg,

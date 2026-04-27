@@ -451,7 +451,11 @@ func fetchReplyInfo(ctx context.Context, svc *gmail.Service, replyToMessageID st
 		if err != nil {
 			return nil, err
 		}
-		return replyInfoFromMessage(msg, includeQuoteBodies), nil
+		info := replyInfoFromMessage(msg, includeQuoteBodies)
+		if info.InReplyTo == "" {
+			return nil, fmt.Errorf("reply target message %s has no Message-ID header; cannot set In-Reply-To/References", replyToMessageID)
+		}
+		return info, nil
 	}
 
 	// For thread replies, we always need just headers to select the latest message.
