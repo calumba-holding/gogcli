@@ -273,6 +273,7 @@ gog auth keyring
 ```
 
 Non-interactive runs (CI/ssh): file backend requires `GOG_KEYRING_PASSWORD`.
+The file backend uses portable encoded filenames for stored keys, so account tokens work on Windows even when key names contain colons.
 
 ```bash
 export GOG_KEYRING_PASSWORD='...'

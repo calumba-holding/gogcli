@@ -184,6 +184,7 @@ func openKeyring() (keyring.Keyring, error) {
 	if err != nil {
 		return nil, err
 	}
+	wrapFileKeys := fileKeyringBackendOnly(backends)
 
 	dbusAddr := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
 	// On Linux with "auto" backend and no D-Bus session, force file backend.
@@ -191,6 +192,7 @@ func openKeyring() (keyring.Keyring, error) {
 	// trying to connect (common on headless systems like Raspberry Pi).
 	if shouldForceFileBackend(runtime.GOOS, backendInfo, dbusAddr) {
 		backends = []keyring.BackendType{keyring.FileBackend}
+		wrapFileKeys = true
 	}
 
 	cfg := keyring.Config{
@@ -211,12 +213,23 @@ func openKeyring() (keyring.Keyring, error) {
 	// is unresponsive (e.g., gnome-keyring installed but not running).
 	// Use a timeout as a safety net.
 	if shouldUseKeyringTimeout(runtime.GOOS, backendInfo, dbusAddr) {
-		return openKeyringWithTimeout(cfg, keyringOpenTimeout)
+		ring, err := openKeyringWithTimeout(cfg, keyringOpenTimeout)
+		if err != nil {
+			return nil, err
+		}
+		if wrapFileKeys {
+			return newFileSafeKeyring(ring), nil
+		}
+		return ring, nil
 	}
 
 	ring, err := keyringOpenFunc(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("open keyring: %w", err)
+	}
+
+	if wrapFileKeys {
+		return newFileSafeKeyring(ring), nil
 	}
 
 	return ring, nil

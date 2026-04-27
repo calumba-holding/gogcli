@@ -94,7 +94,7 @@ Implementation: `internal/config/*`.
 - Legacy key format: `token:<email>` (migrated on first read)
 - Stored payload is JSON (refresh token + metadata like selected services/scopes).
 - Fallback: if no OS credential store is available, keyring may use its encrypted "file" backend:
-  - Directory: `$(os.UserConfigDir())/gogcli/keyring/` (one file per key)
+  - Directory: `$(os.UserConfigDir())/gogcli/keyring/` (one file per key; gog-managed key names are encoded for portable filenames)
   - Password: prompts on TTY; for non-interactive runs set `GOG_KEYRING_PASSWORD`
 
 Current minimal management commands (implemented):
