@@ -17,6 +17,7 @@
 - Gmail: build outbound `Date` headers with the configured timezone so replies do not inherit a wrong host-local offset. (#514, #472) — thanks @dinakars777.
 - Gmail: preserve renewed watch expiration fields when a long-running `gmail watch serve` process records push delivery state after `gmail watch renew` runs separately. (#526)
 - Gmail: auto-fill draft reply subjects from the original message when `gmail drafts create --reply-to-message-id` omits `--subject`. (#488) — thanks @jbowerbir.
+- Gmail: fall back to the People profile name for primary-account `From` headers when Gmail send-as settings omit a display name. (#431) — thanks @moeedahmed.
 - Gmail: reuse the shared paginated list runner for thread and message search so `--all`, `--page`, text, and JSON output stay consistent.
 - Drive: print large upload progress to stderr while keeping JSON output parseable. (#529)
 - Drive: include `hasThumbnail` and `thumbnailLink` in `drive ls`, `drive search`, and `drive get` JSON responses. (#486) — thanks @gtapps.
@@ -25,6 +26,7 @@
 - Drive: include `driveId` in `drive ls`, `drive search`, and `drive get` field masks so Shared Drive files can be identified in JSON output. (#524) — thanks @LeanSheng.
 - Gmail: expose reply threading headers in default `gmail get --format metadata` output and fail explicit reply targets that cannot provide a `Message-ID`. (#528, #512) — thanks @solomonneas.
 - Docs: include available tab names when `docs cat --tab` / structure lookup cannot find the requested tab. (#532) — thanks @johnbenjaminlewis.
+- Docs: size Markdown images consistently for `docs write --replace --markdown` by reusing the Docs image insertion path after Drive conversion. (#518) — thanks @vinothd-oai.
 
 ## 0.13.0 - 2026-04-20
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"google.golang.org/api/gmail/v1"
+	"google.golang.org/api/people/v1"
 
 	"github.com/steipete/gogcli/internal/config"
 	"github.com/steipete/gogcli/internal/outfmt"
@@ -99,9 +100,38 @@ func resolveComposeFrom(ctx context.Context, svc *gmail.Service, account, from s
 	if sendAsListErr == nil {
 		if displayName := primaryDisplayNameFromSendAsList(sendAsList, account); displayName != "" {
 			result.header = displayName + " <" + account + ">"
+		} else if displayName := primaryDisplayNameFromPeople(ctx, account); displayName != "" {
+			result.header = displayName + " <" + account + ">"
 		}
 	}
 	return result, nil
+}
+
+func primaryDisplayNameFromPeople(ctx context.Context, account string) string {
+	svc, err := newPeopleContactsService(ctx, account)
+	if err != nil {
+		return ""
+	}
+	person, err := svc.People.Get(peopleMeResource).PersonFields("names").Context(ctx).Do()
+	if err != nil {
+		return ""
+	}
+	return primaryDisplayNameFromPerson(person)
+}
+
+func primaryDisplayNameFromPerson(person *people.Person) string {
+	if person == nil {
+		return ""
+	}
+	for _, name := range person.Names {
+		if name == nil {
+			continue
+		}
+		if displayName := strings.TrimSpace(name.DisplayName); displayName != "" {
+			return displayName
+		}
+	}
+	return ""
 }
 
 func prepareComposeReply(ctx context.Context, svc *gmail.Service, replyToMessageID, threadID string, quote bool, plainBody, htmlBody string) (*replyInfo, string, string, error) {
