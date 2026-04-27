@@ -287,6 +287,40 @@ func TestPushRemovesStaleEncryptedShards(t *testing.T) {
 	}
 }
 
+func TestPushPreservesUntouchedServices(t *testing.T) {
+	ctx, repo, config, _ := initTestBackup(t)
+	gmailPath := "data/gmail/acct/messages/2026/04/part-0001.jsonl.gz.age"
+	calendarPath := "data/calendar/acct/events/part-0001.jsonl.gz.age"
+	gmailShard := mustGmailMessageShard(t, gmailPath, []map[string]string{{"id": "m1", "raw": "body"}})
+	calendarShard, err := NewJSONLShard("calendar", "events", "acct", calendarPath, []map[string]string{{"id": "event1"}})
+	if err != nil {
+		t.Fatalf("NewJSONLShard calendar: %v", err)
+	}
+	pushSingleShard(t, ctx, config, gmailShard)
+	if _, err := PushSnapshot(ctx, Snapshot{
+		Services: []string{"calendar"},
+		Accounts: []string{"acct"},
+		Counts:   map[string]int{"calendar.events": 1},
+		Shards:   []PlainShard{calendarShard},
+	}, Options{ConfigPath: config, Push: false}); err != nil {
+		t.Fatalf("PushSnapshot calendar: %v", err)
+	}
+
+	manifest := readTestManifest(t, repo)
+	if _, ok := manifest.entry(gmailPath); !ok {
+		t.Fatal("gmail shard was removed by calendar-only push")
+	}
+	if _, ok := manifest.entry(calendarPath); !ok {
+		t.Fatal("calendar shard missing")
+	}
+	if manifest.Counts["gmail.messages"] != 1 || manifest.Counts["calendar.events"] != 1 {
+		t.Fatalf("counts = %+v, want preserved gmail and new calendar", manifest.Counts)
+	}
+	if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(gmailPath))); err != nil {
+		t.Fatalf("gmail shard file missing: %v", err)
+	}
+}
+
 func TestRejectsInvalidShardPaths(t *testing.T) {
 	_, _, config, _ := initTestBackup(t)
 	for _, rel := range []string{

@@ -197,7 +197,15 @@ func NewJSONLShard(service, kind, account, rel string, rows any) (PlainShard, er
 func writeSnapshot(ctx context.Context, cfg Config, snapshot Snapshot, old Manifest) (Manifest, error) {
 	recipients := normalizedStrings(cfg.Recipients)
 	reuseEncrypted := sameStrings(old.Recipients, recipients)
-	shards := make([]ShardEntry, 0, len(snapshot.Shards))
+	updatedServices := snapshotServices(snapshot)
+	shards := make([]ShardEntry, 0, len(old.Shards)+len(snapshot.Shards))
+	if reuseEncrypted {
+		for _, shard := range old.Shards {
+			if _, ok := updatedServices[shard.Service]; !ok {
+				shards = append(shards, shard)
+			}
+		}
+	}
 	for _, shard := range snapshot.Shards {
 		select {
 		case <-ctx.Done():
@@ -217,9 +225,9 @@ func writeSnapshot(ctx context.Context, cfg Config, snapshot Snapshot, old Manif
 		Encrypted:  true,
 		Exported:   time.Now().UTC(),
 		Recipients: recipients,
-		Services:   normalizedStrings(snapshot.Services),
-		Accounts:   normalizedStrings(snapshot.Accounts),
-		Counts:     cloneCounts(snapshot.Counts),
+		Services:   mergedManifestStrings(old.Services, snapshot.Services, reuseEncrypted),
+		Accounts:   mergedManifestStrings(old.Accounts, snapshot.Accounts, reuseEncrypted),
+		Counts:     mergedManifestCounts(old.Counts, snapshot.Counts, updatedServices, reuseEncrypted),
 		Shards:     shards,
 	}
 	if manifest.Counts == nil {
@@ -242,6 +250,50 @@ func writeSnapshot(ctx context.Context, cfg Config, snapshot Snapshot, old Manif
 		return Manifest{}, err
 	}
 	return manifest, nil
+}
+
+func snapshotServices(snapshot Snapshot) map[string]struct{} {
+	services := map[string]struct{}{}
+	for _, service := range snapshot.Services {
+		service = strings.TrimSpace(service)
+		if service != "" {
+			services[service] = struct{}{}
+		}
+	}
+	for _, shard := range snapshot.Shards {
+		service := strings.TrimSpace(shard.Service)
+		if service != "" {
+			services[service] = struct{}{}
+		}
+	}
+	return services
+}
+
+func mergedManifestStrings(old, next []string, preserveOld bool) []string {
+	if !preserveOld {
+		return normalizedStrings(next)
+	}
+	return normalizedStrings(append(append([]string(nil), old...), next...))
+}
+
+func mergedManifestCounts(old, next map[string]int, updatedServices map[string]struct{}, preserveOld bool) map[string]int {
+	out := map[string]int{}
+	if preserveOld {
+		for key, value := range old {
+			service, _, _ := strings.Cut(key, ".")
+			if _, ok := updatedServices[service]; ok {
+				continue
+			}
+			out[key] = value
+		}
+	}
+	for key, value := range next {
+		out[key] = value
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func writeShard(cfg Config, old Manifest, shard PlainShard, reuseEncrypted bool) (ShardEntry, error) {
@@ -429,17 +481,6 @@ func sameStrings(a, b []string) bool {
 		}
 	}
 	return true
-}
-
-func cloneCounts(in map[string]int) map[string]int {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make(map[string]int, len(in))
-	for key, value := range in {
-		out[key] = value
-	}
-	return out
 }
 
 func removeStaleShards(repo string, shards []ShardEntry) error {

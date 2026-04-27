@@ -3,7 +3,7 @@
 ## 0.14.0 - Unreleased
 
 ### Added
-- Backup: add `gog backup` with age-encrypted Git shards, Gmail labels/raw message export, manifest status, full decrypt-and-verify, shard `cat`, local plaintext export, docs, and security-focused regression coverage.
+- Backup: add `gog backup` with age-encrypted Git shards, Gmail labels/raw message export, Calendar/Contacts/Tasks/Drive metadata adapters, manifest status, full decrypt-and-verify, shard `cat`, local plaintext export, docs, and security-focused regression coverage.
 
 ### Fixed
 - Drive: include `driveId` in `drive ls`, `drive search`, and `drive get` field masks so Shared Drive files can be identified in JSON output. (#524) — thanks @LeanSheng.

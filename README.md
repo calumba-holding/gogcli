@@ -725,7 +725,7 @@ Gmail watch (Pub/Sub push):
 
 ```bash
 gog backup init --repo ~/Projects/backup-gog --remote https://github.com/steipete/backup-gog.git
-gog backup push --services gmail --account you@gmail.com
+gog backup push --services all --account you@gmail.com
 gog backup status
 gog backup verify
 gog backup cat data/gmail/<account-hash>/labels.jsonl.gz.age --pretty
@@ -743,9 +743,15 @@ private age identity locally at `~/.gog/age.key`; GitHub only receives public
 `age1...` recipients, `manifest.json`, and encrypted `*.jsonl.gz.age` payloads.
 The private `AGE-SECRET-KEY-...` value must stay local or in a password manager.
 
+Supported backup services are `gmail`, `calendar`, `contacts`, `tasks`, and
+`drive` metadata; `all` expands to those services. A service-specific push
+updates that service and preserves existing shards for services that were not
+selected, as long as recipients are unchanged.
+
 Use `gog backup cat` to decrypt one shard as JSONL, or `gog backup export` to
 write a local plaintext copy. The export writes Gmail messages as `.eml` files,
 plus `gmail/<account-hash>/messages/index.jsonl` and pretty `labels.json`.
+Other services export as verified JSONL under `raw/`.
 That export is intentionally unencrypted; keep it out of Git, shared folders,
 and cloud sync unless that is intentional.
 

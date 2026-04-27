@@ -24,7 +24,13 @@ gog backup init \
   --remote https://github.com/steipete/backup-gog.git
 ```
 
-Back up Gmail:
+Back up all supported services:
+
+```bash
+gog backup push --services all --account steipete@gmail.com
+```
+
+Back up only Gmail:
 
 ```bash
 gog backup push --services gmail --account steipete@gmail.com
@@ -63,6 +69,20 @@ gog backup export --out ~/Documents/gog-backup-export
 Use `--no-push` on `init` or `push` to commit locally without pushing to the
 remote.
 
+Supported services:
+
+- `gmail`: labels and raw MIME messages.
+- `calendar`: calendar list entries and all events, including deleted events.
+- `contacts`: People API contacts and other contacts.
+- `tasks`: task lists and tasks, including completed, deleted, hidden, and
+  assigned tasks.
+- `drive`: shared drives and Drive file metadata. File contents are not copied
+  by the Drive adapter yet.
+
+`all` expands to every supported service. Pushing a subset updates that subset
+and preserves existing shards for services that were not selected, as long as
+the age recipients are unchanged.
+
 ## Files
 
 Local config:
@@ -79,6 +99,10 @@ README.md
 manifest.json
 data/gmail/<account-hash>/labels.jsonl.gz.age
 data/gmail/<account-hash>/messages/YYYY/MM/part-0001.jsonl.gz.age
+data/calendar/<account-hash>/...
+data/contacts/<account-hash>/...
+data/drive/<account-hash>/...
+data/tasks/<account-hash>/...
 ```
 
 `manifest.json` is intentionally cleartext. It contains format version, export
@@ -100,9 +124,9 @@ raw/<service>/...
 
 `gog backup export` decrypts and verifies the manifest-backed shards before
 writing files. Gmail messages become `.eml` files that open in Mail and other
-mail clients. The export is not encrypted; do not place it inside the backup
-Git repository, and keep it out of synced/shared folders unless that is
-intentional.
+mail clients. Other services are written as verified JSONL under `raw/`. The
+export is not encrypted; do not place it inside the backup Git repository, and
+keep it out of synced/shared folders unless that is intentional.
 
 ## Encryption
 
@@ -175,9 +199,9 @@ Future hardening ideas:
 - Add optional shard padding or disable gzip for deployments that care more
   about size side channels than repository size.
 
-## Gmail Adapter
+## Service Adapters
 
-The first adapter backs up:
+The Gmail adapter backs up:
 
 - Gmail labels.
 - Raw Gmail messages from `users.messages.get(format=raw)`.
@@ -188,6 +212,14 @@ friendly.
 
 `--include-spam-trash` defaults to true. Use `--query` and `--max` for bounded
 test exports; omit them for a full mailbox scan.
+
+The Calendar adapter backs up calendar list entries and all events from each
+calendar. The Contacts adapter backs up contacts and other contacts. The Tasks
+adapter backs up task lists and tasks. The Drive adapter backs up shared drives
+and file metadata, including names, owners, parents, links, checksums, export
+links, and selected custom properties. Drive file contents are intentionally
+left for a later adapter pass because they need format choices, bandwidth
+limits, and resume/checkpoint behavior.
 
 ## Adding Services
 
@@ -200,4 +232,5 @@ Keep one backup engine and add service adapters. A service adapter should:
 4. Add cleartext manifest counts and account hashes only.
 5. Support bounded smoke flags when the service can be huge.
 
-Good next adapters: Calendar, Contacts/People, Tasks, then Drive.
+Good next adapters: Drive file content export, Docs/Sheets/Slides native
+exports, Chat, Forms, Classroom, and Apps Script.

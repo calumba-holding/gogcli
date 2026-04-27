@@ -33,7 +33,13 @@ type BackupGmailCmd struct {
 	Push BackupGmailPushCmd `cmd:"" name:"push" help:"Export Gmail into encrypted backup shards"`
 }
 
-const backupServiceGmail = "gmail"
+const (
+	backupServiceCalendar = "calendar"
+	backupServiceContacts = "contacts"
+	backupServiceDrive    = "drive"
+	backupServiceGmail    = "gmail"
+	backupServiceTasks    = "tasks"
+)
 
 type backupFlags struct {
 	Config     string   `name:"config" help:"Backup config path" default:""`
@@ -103,17 +109,35 @@ type BackupPushCmd struct {
 	Query            string `name:"query" help:"Gmail query for bounded/test backups"`
 	Max              int64  `name:"max" aliases:"limit" help:"Max Gmail messages to export; 0 means all" default:"0"`
 	IncludeSpamTrash bool   `name:"include-spam-trash" help:"Include Gmail spam and trash" default:"true"`
-	ShardMaxRows     int    `name:"shard-max-rows" help:"Max Gmail messages per encrypted shard" default:"1000"`
+	ShardMaxRows     int    `name:"shard-max-rows" help:"Max rows per encrypted shard" default:"1000"`
 }
 
 func (c *BackupPushCmd) Run(ctx context.Context, flags *RootFlags) error {
-	services := splitCSV(c.Services)
+	services := expandBackupServices(splitCSV(c.Services))
 	if len(services) == 0 {
 		return usage("at least one --services value is required")
 	}
 	var snapshots []backup.Snapshot
 	for _, service := range services {
 		switch strings.ToLower(strings.TrimSpace(service)) {
+		case backupServiceCalendar:
+			snapshot, err := buildCalendarBackupSnapshot(ctx, flags, c.ShardMaxRows)
+			if err != nil {
+				return err
+			}
+			snapshots = append(snapshots, snapshot)
+		case backupServiceContacts:
+			snapshot, err := buildContactsBackupSnapshot(ctx, flags, c.ShardMaxRows)
+			if err != nil {
+				return err
+			}
+			snapshots = append(snapshots, snapshot)
+		case backupServiceDrive:
+			snapshot, err := buildDriveBackupSnapshot(ctx, flags, c.ShardMaxRows)
+			if err != nil {
+				return err
+			}
+			snapshots = append(snapshots, snapshot)
 		case backupServiceGmail:
 			snapshot, err := buildGmailBackupSnapshot(ctx, flags, gmailBackupOptions{
 				Query:            c.Query,
@@ -125,8 +149,14 @@ func (c *BackupPushCmd) Run(ctx context.Context, flags *RootFlags) error {
 				return err
 			}
 			snapshots = append(snapshots, snapshot)
+		case backupServiceTasks:
+			snapshot, err := buildTasksBackupSnapshot(ctx, flags, c.ShardMaxRows)
+			if err != nil {
+				return err
+			}
+			snapshots = append(snapshots, snapshot)
 		default:
-			return fmt.Errorf("unsupported backup service %q (currently: gmail)", service)
+			return fmt.Errorf("unsupported backup service %q (supported: all, calendar, contacts, drive, gmail, tasks)", service)
 		}
 	}
 	result, err := backup.PushSnapshot(ctx, mergeBackupSnapshots(snapshots...), c.options())
