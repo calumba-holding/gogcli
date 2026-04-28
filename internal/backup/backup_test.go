@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -138,6 +139,67 @@ func TestPushCheckpointWritesIncompleteManifestOutsideMainSnapshot(t *testing.T)
 	pushSingleShard(t, ctx, config, mustGmailMessageShard(t, "data/gmail/acct/messages/2026/04/part-0001.jsonl.gz.age", []map[string]string{{"id": "m1", "raw": "final"}}))
 	if _, err := os.Stat(filepath.Join(repo, "checkpoints", "gmail", "acct", "run-one", "messages", "part-000001.jsonl.gz.age")); err != nil {
 		t.Fatalf("final snapshot removed checkpoint shard: %v", err)
+	}
+}
+
+func TestAsyncCheckpointPushDrainsBeforeFinalSnapshot(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	remote := filepath.Join(dir, "remote.git")
+	config := filepath.Join(dir, "backup.json")
+	identity := filepath.Join(dir, "age.key")
+	if err := git(ctx, "", "init", "--bare", "--initial-branch=main", remote); err != nil {
+		t.Fatalf("init remote: %v", err)
+	}
+	recipient, err := EnsureIdentity(identity)
+	if err != nil {
+		t.Fatalf("EnsureIdentity: %v", err)
+	}
+	if saveErr := SaveConfig(config, Config{Repo: repo, Remote: remote, Identity: identity, Recipients: []string{recipient}}); saveErr != nil {
+		t.Fatalf("SaveConfig: %v", saveErr)
+	}
+	var progressMu sync.Mutex
+	var progress []string
+	progressf := func(format string, args ...any) {
+		progressMu.Lock()
+		defer progressMu.Unlock()
+		progress = append(progress, strings.TrimSpace(format))
+	}
+	checkpointShard := mustGmailMessageShard(t, "checkpoints/gmail/acct/run-one/messages/part-000001.jsonl.gz.age", []map[string]string{{"id": "m1"}})
+	if _, pushErr := PushCheckpoint(ctx, Snapshot{
+		Services: []string{"gmail"},
+		Accounts: []string{"acct"},
+		Counts:   map[string]int{"gmail.messages": 1},
+		Shards:   []PlainShard{checkpointShard},
+	}, Checkpoint{RunID: "run-one", Service: "gmail", Account: "acct", Done: 1, Total: 2}, Options{ConfigPath: config, Push: true, AsyncPush: true, Progress: progressf}); pushErr != nil {
+		t.Fatalf("PushCheckpoint: %v", pushErr)
+	}
+	finalShard := mustGmailMessageShard(t, "data/gmail/acct/messages/2026/04/part-0001.jsonl.gz.age", []map[string]string{{"id": "m1"}})
+	if _, pushErr := PushSnapshot(ctx, Snapshot{
+		Services: []string{"gmail"},
+		Accounts: []string{"acct"},
+		Counts:   map[string]int{"gmail.messages": 1},
+		Shards:   []PlainShard{finalShard},
+	}, Options{ConfigPath: config, Push: true, Progress: progressf}); pushErr != nil {
+		t.Fatalf("PushSnapshot: %v", pushErr)
+	}
+	local, err := gitOutput(ctx, repo, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatalf("local HEAD: %v", err)
+	}
+	remoteHead, err := gitOutput(ctx, repo, "ls-remote", "origin", "refs/heads/main")
+	if err != nil {
+		t.Fatalf("remote HEAD: %v", err)
+	}
+	if !strings.HasPrefix(remoteHead, strings.TrimSpace(local)) {
+		t.Fatalf("remote HEAD = %q, want local %q", remoteHead, local)
+	}
+	progressMu.Lock()
+	gotProgress := append([]string(nil), progress...)
+	progressMu.Unlock()
+	if !containsProgress(gotProgress, "backup git push") {
+		t.Fatalf("missing async push progress: %#v", gotProgress)
 	}
 }
 
@@ -532,6 +594,15 @@ func pushSingleShard(t *testing.T, ctx context.Context, config string, shard Pla
 		t.Fatalf("PushSnapshot: %v", err)
 	}
 	return result
+}
+
+func containsProgress(lines []string, want string) bool {
+	for _, line := range lines {
+		if strings.Contains(line, want) {
+			return true
+		}
+	}
+	return false
 }
 
 func readTestManifest(t *testing.T, repo string) Manifest {

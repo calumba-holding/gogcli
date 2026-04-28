@@ -135,6 +135,9 @@ func (c *BackupPushCmd) Run(ctx context.Context, flags *RootFlags) error {
 	if len(services) == 0 {
 		return usage("at least one --services value is required")
 	}
+	backupOpts := c.options()
+	backupOpts.AsyncPush = c.GmailCheckpoints
+	backupOpts.Progress = func(format string, args ...any) { gmailBackupProgressf(ctx, format, args...) }
 	var snapshots []backup.Snapshot
 	for _, service := range services {
 		switch strings.ToLower(strings.TrimSpace(service)) {
@@ -198,7 +201,7 @@ func (c *BackupPushCmd) Run(ctx context.Context, flags *RootFlags) error {
 				Checkpoints:      c.GmailCheckpoints,
 				CheckpointRows:   c.GmailCheckpointRows,
 				CheckpointEvery:  c.GmailCheckpointEvery,
-				BackupOptions:    c.options(),
+				BackupOptions:    backupOpts,
 			})
 			if err != nil {
 				return err
@@ -256,7 +259,7 @@ func (c *BackupPushCmd) Run(ctx context.Context, flags *RootFlags) error {
 			return fmt.Errorf("unsupported backup service %q (supported: all, admin, appscript, calendar, chat, classroom, contacts, drive, gmail, gmail-settings, groups, keep, tasks, workspace)", service)
 		}
 	}
-	result, err := backup.PushSnapshot(ctx, mergeBackupSnapshots(snapshots...), c.options())
+	result, err := backup.PushSnapshot(ctx, mergeBackupSnapshots(snapshots...), backupOpts)
 	if err != nil {
 		return err
 	}
@@ -289,6 +292,9 @@ type BackupGmailPushCmd struct {
 }
 
 func (c *BackupGmailPushCmd) Run(ctx context.Context, flags *RootFlags) error {
+	backupOpts := c.options()
+	backupOpts.AsyncPush = c.Checkpoints
+	backupOpts.Progress = func(format string, args ...any) { gmailBackupProgressf(ctx, format, args...) }
 	snapshot, err := buildGmailBackupSnapshot(ctx, flags, gmailBackupOptions{
 		Query:            c.Query,
 		Max:              c.Max,
@@ -299,12 +305,12 @@ func (c *BackupGmailPushCmd) Run(ctx context.Context, flags *RootFlags) error {
 		Checkpoints:      c.Checkpoints,
 		CheckpointRows:   c.CheckpointRows,
 		CheckpointEvery:  c.CheckpointEvery,
-		BackupOptions:    c.options(),
+		BackupOptions:    backupOpts,
 	})
 	if err != nil {
 		return err
 	}
-	result, err := backup.PushSnapshot(ctx, snapshot, c.options())
+	result, err := backup.PushSnapshot(ctx, snapshot, backupOpts)
 	if err != nil {
 		return err
 	}

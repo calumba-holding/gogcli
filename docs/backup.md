@@ -282,12 +282,17 @@ to use the root `manifest.json` as the authoritative completed backup. This
 keeps long runs crash-tolerant without pretending partial data is a finished
 snapshot. A checkpoint commit can cover many messages, but its encrypted files
 are split by both row count and a conservative plaintext byte ceiling so large
-messages do not create GitHub-rejected blobs. Tune the commit cadence with
-`--gmail-checkpoint-rows` / `--gmail-checkpoint-interval` on `gog backup push`,
-or `--checkpoint-rows` / `--checkpoint-interval` on `gog backup gmail push`;
-set the interval or rows to `0` to disable that trigger, or use
-`--no-gmail-checkpoints` / `--no-checkpoints` to disable checkpoint pushes
-entirely.
+messages do not create GitHub-rejected blobs. Checkpoint commits push through a
+single ordered background queue: `gog` records the exact commit SHA, continues
+cached Gmail fetching, and pushes queued SHAs to the current branch one at a
+time. Transient push failures are retried; GitHub hard rejections stop later
+checkpoints because descendants would inherit the rejected object. The final
+completed backup waits for the queue to drain before writing and pushing the
+root manifest. Tune the commit cadence with `--gmail-checkpoint-rows` /
+`--gmail-checkpoint-interval` on `gog backup push`, or `--checkpoint-rows` /
+`--checkpoint-interval` on `gog backup gmail push`; set the interval or rows to
+`0` to disable that trigger, or use `--no-gmail-checkpoints` /
+`--no-checkpoints` to disable checkpoint pushes entirely.
 
 `--include-spam-trash` defaults to true. Use `--query` and `--max` for bounded
 test exports; omit them for a full mailbox scan.

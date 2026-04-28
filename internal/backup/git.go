@@ -54,24 +54,43 @@ func ensureRepo(ctx context.Context, cfg Config) error {
 }
 
 func commitAndPush(ctx context.Context, cfg Config, message string, push bool) (bool, error) {
-	if err := removeTempShardFiles(cfg.Repo); err != nil {
-		return false, err
+	changed, _, err := commitChanges(ctx, cfg, message)
+	if err != nil || !changed || !push {
+		return changed, err
 	}
-	if err := git(ctx, cfg.Repo, "add", "."); err != nil {
-		return false, err
-	}
-	if err := git(ctx, cfg.Repo, "diff", "--cached", "--quiet"); err == nil {
-		return false, nil
-	}
-	if err := git(ctx, cfg.Repo, "commit", "-m", message); err != nil {
-		return false, err
-	}
-	if push {
-		if err := git(ctx, cfg.Repo, "push", "-u", "origin", "HEAD"); err != nil {
-			return true, err
-		}
+	if err := git(ctx, cfg.Repo, "push", "-u", "origin", "HEAD"); err != nil {
+		return true, err
 	}
 	return true, nil
+}
+
+func commitChanges(ctx context.Context, cfg Config, message string) (bool, string, error) {
+	if err := removeTempShardFiles(cfg.Repo); err != nil {
+		return false, "", err
+	}
+	if err := git(ctx, cfg.Repo, "add", "."); err != nil {
+		return false, "", err
+	}
+	if err := git(ctx, cfg.Repo, "diff", "--cached", "--quiet"); err == nil {
+		return false, "", nil
+	}
+	if err := git(ctx, cfg.Repo, "commit", "-m", message); err != nil {
+		return false, "", err
+	}
+	sha, err := gitOutput(ctx, cfg.Repo, "rev-parse", "HEAD")
+	if err != nil {
+		return true, "", err
+	}
+	return true, strings.TrimSpace(sha), nil
+}
+
+func pushCommit(ctx context.Context, cfg Config, sha string) error {
+	branch, err := gitOutput(ctx, cfg.Repo, "symbolic-ref", "--quiet", "--short", "HEAD")
+	if err != nil || strings.TrimSpace(branch) == "" {
+		branch = "main"
+	}
+	refspec := strings.TrimSpace(sha) + ":refs/heads/" + strings.TrimSpace(branch)
+	return git(ctx, cfg.Repo, "push", "-u", "origin", refspec)
 }
 
 func git(ctx context.Context, dir string, args ...string) error {
@@ -92,4 +111,25 @@ func git(ctx context.Context, dir string, args ...string) error {
 		return fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
 	}
 	return nil
+}
+
+func gitOutput(ctx context.Context, dir string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", args...) // #nosec G204 -- callers pass fixed git subcommands plus configured repo paths.
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=gog",
+		"GIT_AUTHOR_EMAIL=gog@example.invalid",
+		"GIT_COMMITTER_NAME=gog",
+		"GIT_COMMITTER_EMAIL=gog@example.invalid",
+	)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if stderr.Len() > 0 {
+			return "", fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+		}
+		return "", fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
+	}
+	return stdout.String(), nil
 }

@@ -126,6 +126,11 @@ func PushSnapshot(ctx context.Context, snapshot Snapshot, opts Options) (Result,
 	if err != nil {
 		return Result{}, err
 	}
+	if opts.Push {
+		if err := waitAsyncPushes(ctx, cfg.Repo, opts.Progress); err != nil {
+			return Result{}, err
+		}
+	}
 	if len(cfg.Recipients) == 0 {
 		recipient, err := RecipientFromIdentity(cfg.Identity)
 		if err != nil {
@@ -164,8 +169,15 @@ func PushCheckpoint(ctx context.Context, snapshot Snapshot, checkpoint Checkpoin
 		}
 		cfg.Recipients = []string{recipient}
 	}
-	if err := ensureRepo(ctx, cfg); err != nil {
-		return Result{}, err
+	if opts.Push {
+		if err := asyncPushError(cfg.Repo); err != nil {
+			return Result{}, err
+		}
+	}
+	if !opts.AsyncPush || !opts.Push || !asyncPusherActive(cfg.Repo) {
+		if err := ensureRepo(ctx, cfg); err != nil {
+			return Result{}, err
+		}
 	}
 	if err := writeBackupReadme(cfg.Repo); err != nil {
 		return Result{}, err
@@ -174,9 +186,19 @@ func PushCheckpoint(ctx context.Context, snapshot Snapshot, checkpoint Checkpoin
 	if err != nil {
 		return Result{}, err
 	}
-	changed, err := commitAndPush(ctx, cfg, fmt.Sprintf("checkpoint: %s backup %d/%d", manifest.Service, manifest.Done, manifest.Total), opts.Push)
+	message := fmt.Sprintf("checkpoint: %s backup %d/%d", manifest.Service, manifest.Done, manifest.Total)
+	changed, sha, err := commitChanges(ctx, cfg, message)
 	if err != nil {
 		return Result{}, err
+	}
+	if changed && opts.Push {
+		if opts.AsyncPush {
+			if err := enqueueAsyncPush(ctx, cfg, opts, sha, message); err != nil {
+				return Result{}, err
+			}
+		} else if err := pushCommit(ctx, cfg, sha); err != nil {
+			return Result{}, err
+		}
 	}
 	counts := map[string]int{}
 	for _, shard := range manifest.Shards {

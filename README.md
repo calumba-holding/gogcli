@@ -772,10 +772,13 @@ memory; progress is written to stderr while stdout stays parseable. Cached
 Gmail runs also push incomplete encrypted checkpoint commits during long fetches
 by default (`--gmail-checkpoint-rows`, `--gmail-checkpoint-interval`,
 `--no-gmail-checkpoints`). Checkpoint files are split by row count and a
-conservative plaintext byte ceiling to avoid GitHub blob rejections.
-Checkpoints live under `checkpoints/` and do not replace the authoritative
-`manifest.json` until the final backup completes. Use `--gmail-refresh-cache`
-to force a refetch. Workspace inventories
+conservative plaintext byte ceiling to avoid GitHub blob rejections. Checkpoint
+commits push through a single ordered background queue so cached Gmail fetching
+can continue while GitHub uploads run; the final completed backup waits for the
+queue to drain before updating the authoritative manifest. Checkpoints live
+under `checkpoints/` and do not replace the authoritative `manifest.json` until
+the final backup completes. Use `--gmail-refresh-cache` to force a refetch.
+Workspace inventories
 Docs/Sheets/Slides and backs up Forms/responses discovered through Drive; add
 `--workspace-native` for full native Docs/Sheets/Slides API JSON.
 Optional Workspace-only services use `--best-effort` by default, recording

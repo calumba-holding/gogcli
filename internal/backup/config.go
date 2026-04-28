@@ -22,12 +22,15 @@ type Config struct {
 }
 
 type Options struct {
-	ConfigPath string
-	Repo       string
-	Remote     string
-	Identity   string
-	Recipients []string
-	Push       bool
+	ConfigPath     string
+	Repo           string
+	Remote         string
+	Identity       string
+	Recipients     []string
+	Push           bool
+	AsyncPush      bool
+	PushQueueLimit int
+	Progress       func(format string, args ...any)
 }
 
 func DefaultConfig() Config {
