@@ -196,6 +196,13 @@ Verify tokens are usable (helps spot revoked/expired tokens):
 gog auth list --check
 ```
 
+Diagnose keyring/password drift and refresh-token failures:
+
+```bash
+gog auth doctor
+gog auth doctor --check
+```
+
 Accounts can be authorized either via OAuth refresh tokens or Workspace service accounts (domain-wide delegation). If a service account key is configured for an account, it takes precedence over OAuth refresh tokens (see `gog auth list`).
 
 Show current auth state/services for the active account:
@@ -276,6 +283,7 @@ gog auth keyring
 
 Non-interactive runs (CI/ssh): file backend requires `GOG_KEYRING_PASSWORD`.
 The file backend uses portable encoded filenames for stored keys, so account tokens work on Windows even when key names contain colons.
+If you see `aes.KeyUnwrap(): integrity check failed`, first run `gog auth doctor`; the usual cause is that different shells/services/agents are using different `GOG_KEYRING_PASSWORD` values for the same encrypted token files.
 
 ```bash
 export GOG_KEYRING_PASSWORD='...'

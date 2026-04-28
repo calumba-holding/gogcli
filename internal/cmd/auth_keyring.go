@@ -63,13 +63,13 @@ func (c *AuthKeyringCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	if backend == "default" {
-		backend = "auto"
+		backend = literalAuto
 	}
 
 	allowed := map[string]struct{}{
-		"auto":     {},
-		"keychain": {},
-		strFile:    {},
+		literalAuto: {},
+		"keychain":  {},
+		strFile:     {},
 	}
 	if _, ok := allowed[backend]; !ok {
 		return usagef("invalid backend: %q (expected auto, keychain, or file)", c.Backend)

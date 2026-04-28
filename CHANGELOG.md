@@ -15,6 +15,7 @@
 - Slides: add `slides insert-text` and `slides replace-text` for editing existing slide text elements and replacing template tokens. (#521) — thanks @chrissanchez-iops.
 - Contacts: add `contacts export` for vCard 4.0 `.vcf` exports by resource, email/name search, or all contacts, including best-effort label categories. (#519, #500) — thanks @dinakars777.
 - Contacts: include birthdays in `contacts list` and `contacts search` text and JSON output. (#441)
+- Auth: add `gog auth doctor` to diagnose keyring backend/password drift, unreadable file-keyring tokens, and refresh-token failures such as Workspace `invalid_rapt`. (#377, #338)
 
 ### Fixed
 - Backup: split Gmail checkpoint commits into smaller encrypted shard files so large messages stay below GitHub's blob limit.

@@ -53,7 +53,7 @@ const (
 	extTXT                 = ".txt"
 	extMD                  = ".md"
 	extHTML                = ".html"
-	formatAuto             = "auto"
+	formatAuto             = literalAuto
 	driveShareToAnyone     = "anyone"
 	driveShareToUser       = "user"
 	driveShareToDomain     = "domain"

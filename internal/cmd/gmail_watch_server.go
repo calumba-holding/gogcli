@@ -372,7 +372,7 @@ func (s *gmailWatchServer) sendHook(ctx context.Context, payload *gmailHookPaylo
 	resp, err := s.hookClient.Do(req)
 	if err != nil {
 		_ = s.store.Update(func(state *gmailWatchState) error {
-			state.LastDeliveryStatus = "error"
+			state.LastDeliveryStatus = literalError
 			state.LastDeliveryAtMs = time.Now().UnixMilli()
 			state.LastDeliveryStatusNote = err.Error()
 			return nil

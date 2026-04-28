@@ -173,6 +173,7 @@ Flag aliases:
 - `gog auth manage [--services ...] [--listen-addr HOST[:PORT]] [--redirect-host HOST]`
 - `gog auth keep <email> --key <service-account.json>` (Google Keep; Workspace only)
 - `gog auth list`
+- `gog auth doctor [--check]` (diagnose keyring/password drift and refresh-token failures)
 - `gog auth alias list`
 - `gog auth alias set <alias> <email>`
 - `gog auth alias unset <alias>`
