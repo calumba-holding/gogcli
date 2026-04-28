@@ -3,6 +3,10 @@ import { importKey, decrypt } from './crypto';
 import { detectBot } from './bot';
 import { pixelResponse } from './pixel';
 
+const OPEN_DEDUP_WINDOW = '-1 hour';
+const IP_RATE_WINDOW = '-1 hour';
+const MAX_OPENS_PER_IP_PER_HOUR = 100;
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -64,6 +68,10 @@ async function handlePixel(request: Request, env: Env, path: string): Promise<Re
   // Detect bots
   const { isBot, botType } = detectBot(userAgent, ip, timeSinceDelivery);
 
+  if (await shouldSkipOpen(env, blob, ip, userAgent)) {
+    return pixelResponse();
+  }
+
   const openedAt = new Date().toISOString();
 
   // Log to D1
@@ -94,6 +102,43 @@ async function handlePixel(request: Request, env: Env, path: string): Promise<Re
   }
 
   return pixelResponse();
+}
+
+async function shouldSkipOpen(env: Env, trackingId: string, ip: string, userAgent: string): Promise<boolean> {
+  try {
+    const duplicate = await env.DB.prepare(`
+      SELECT 1
+      FROM opens
+      WHERE tracking_id = ?
+        AND ip = ?
+        AND user_agent = ?
+        AND opened_at > datetime('now', ?)
+      LIMIT 1
+    `).bind(
+      trackingId,
+      ip,
+      userAgent,
+      OPEN_DEDUP_WINDOW
+    ).first();
+    if (duplicate) {
+      return true;
+    }
+
+    const row = await env.DB.prepare(`
+      SELECT COUNT(*) AS count
+      FROM opens
+      WHERE ip = ?
+        AND opened_at > datetime('now', ?)
+    `).bind(
+      ip,
+      IP_RATE_WINDOW
+    ).first<{ count: number }>();
+
+    return Number(row?.count || 0) >= MAX_OPENS_PER_IP_PER_HOUR;
+  } catch (error) {
+    console.error('Failed to check open rate limit:', error);
+    return false;
+  }
 }
 
 async function handleQuery(request: Request, env: Env, path: string): Promise<Response> {

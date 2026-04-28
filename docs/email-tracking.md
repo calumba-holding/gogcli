@@ -14,6 +14,10 @@ High-level:
 - The Worker receives the request, stores an “open” row in D1, and returns a transparent pixel.
 - `gog gmail track opens …` queries the Worker and prints opens.
 
+Abuse controls:
+- Repeated opens for the same tracking id, IP, and user-agent are deduplicated within a one-hour window.
+- Each IP can record at most 100 opens per hour; excess requests still receive the transparent pixel but are not inserted into D1.
+
 Privacy note:
 - Tracking is inherently sensitive. Treat this as *instrumentation you opt into per email*.
 - The Worker stores IP + user-agent and can derive coarse geo (depending on CF headers/config).

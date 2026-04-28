@@ -25,6 +25,7 @@
 ### Fixed
 - Backup: split Gmail checkpoint commits by row count and plaintext byte size so large messages stay below GitHub's blob limit.
 - Auth: keep `gog auth list` and `gog auth tokens list` useful when one file-keyring token cannot be decrypted; unreadable entries are now reported instead of aborting the whole listing. (#377)
+- Email tracking: deduplicate repeated pixel opens and cap recorded opens per IP per hour to reduce D1 abuse from replay or high-volume requests. (#294)
 - Auth: time out Linux D-Bus keyring write operations and report when OAuth completed but saving the refresh token failed, so manual auth no longer looks like a stuck paste when token persistence is blocked. (#130)
 - Install docs: document Windows release ZIP/PATH setup and clarify that source builds require the Go version declared in `go.mod`, not Ubuntu 24.04's Go 1.22 package. (#157, #135)
 - CI: pin GitHub Actions workflow dependencies to immutable commit SHAs. (#288)
