@@ -97,14 +97,32 @@ func looksLikeCustomLabelID(raw string) bool {
 }
 
 func ensureLabelNameAvailable(svc *gmail.Service, name string) error {
-	idMap, err := fetchLabelNameToID(svc)
+	resp, err := svc.Users.Labels.List("me").Fields("labels(id,name)").Do()
 	if err != nil {
 		return err
 	}
-	if _, ok := idMap[strings.ToLower(name)]; ok {
-		return usagef("label already exists: %s", name)
+
+	want := strings.ToLower(strings.TrimSpace(name))
+	wantCollision := gmailLabelNameCollisionKey(name)
+	for _, label := range resp.Labels {
+		if label == nil {
+			continue
+		}
+		if strings.ToLower(strings.TrimSpace(label.Id)) == want {
+			return usagef("label already exists: %s", name)
+		}
+		labelName := strings.TrimSpace(label.Name)
+		if strings.ToLower(labelName) == want || gmailLabelNameCollisionKey(labelName) == wantCollision {
+			return usagef("label already exists: %s", name)
+		}
 	}
 	return nil
+}
+
+func gmailLabelNameCollisionKey(name string) string {
+	// Gmail accepts slash-separated nested labels, but the API rejects names that
+	// collide after slash-to-hyphen normalization (for example a/b vs a-b).
+	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(name)), "/", "-")
 }
 
 func mapLabelCreateError(err error, name string) error {

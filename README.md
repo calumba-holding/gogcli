@@ -690,6 +690,7 @@ gog gmail labels list
 gog gmail labels get INBOX --json  # Includes message counts
 gog gmail labels create "My Label"
 gog gmail labels create "Projects/Review"  # Nested Gmail label
+# Gmail rejects slash/hyphen collisions such as Projects/Review when Projects-Review exists.
 gog gmail labels rename "Old Label" "New Label"
 gog gmail labels style "My Label" --text-color "#ffffff" --background-color "#4285f4"
 gog gmail labels modify <threadId> --add STARRED --remove INBOX
