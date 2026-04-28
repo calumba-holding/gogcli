@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.14.0 - Unreleased
+## 0.14.0 - 2026-04-28
 
 ### Added
 - Backup: add `gog backup` with age-encrypted Git shards, Gmail labels/raw message export, Calendar/Contacts/Tasks/Drive metadata adapters, manifest status, full decrypt-and-verify, shard `cat`, local plaintext export, docs, and security-focused regression coverage.
