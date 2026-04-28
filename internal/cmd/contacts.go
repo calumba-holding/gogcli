@@ -16,6 +16,7 @@ type ContactsCmd struct {
 	Search    ContactsSearchCmd    `cmd:"" name:"search" help:"Search contacts by name/email/phone"`
 	List      ContactsListCmd      `cmd:"" name:"list" aliases:"ls" help:"List contacts"`
 	Get       ContactsGetCmd       `cmd:"" name:"get" aliases:"info,show" help:"Get a contact"`
+	Export    ContactsExportCmd    `cmd:"" name:"export" help:"Export contacts as vCard (.vcf)"`
 	Create    ContactsCreateCmd    `cmd:"" name:"create" aliases:"add,new" help:"Create a contact"`
 	Update    ContactsUpdateCmd    `cmd:"" name:"update" aliases:"edit,set" help:"Update a contact"`
 	Delete    ContactsDeleteCmd    `cmd:"" name:"delete" aliases:"rm,del,remove" help:"Delete a contact"`
@@ -55,6 +56,7 @@ func (c *ContactsSearchCmd) Run(ctx context.Context, flags *RootFlags) error {
 			Name     string `json:"name,omitempty"`
 			Email    string `json:"email,omitempty"`
 			Phone    string `json:"phone,omitempty"`
+			Birthday string `json:"birthday,omitempty"`
 		}
 		items := make([]item, 0, len(resp.Results))
 		for _, r := range resp.Results {
@@ -67,6 +69,7 @@ func (c *ContactsSearchCmd) Run(ctx context.Context, flags *RootFlags) error {
 				Name:     primaryName(p),
 				Email:    primaryEmail(p),
 				Phone:    primaryPhone(p),
+				Birthday: primaryBirthday(p),
 			})
 		}
 		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{"contacts": items})
@@ -78,7 +81,7 @@ func (c *ContactsSearchCmd) Run(ctx context.Context, flags *RootFlags) error {
 
 	w, flush := tableWriter(ctx)
 	defer flush()
-	fmt.Fprintln(w, "RESOURCE\tNAME\tEMAIL\tPHONE")
+	fmt.Fprintln(w, "RESOURCE\tNAME\tEMAIL\tPHONE\tBIRTHDAY")
 	for _, r := range resp.Results {
 		p := r.Person
 		if p == nil {
@@ -86,11 +89,12 @@ func (c *ContactsSearchCmd) Run(ctx context.Context, flags *RootFlags) error {
 		}
 		fmt.Fprintf(
 			w,
-			"%s\t%s\t%s\t%s\n",
+			"%s\t%s\t%s\t%s\t%s\n",
 			p.ResourceName,
 			sanitizeTab(primaryName(p)),
 			sanitizeTab(primaryEmail(p)),
 			sanitizeTab(primaryPhone(p)),
+			sanitizeTab(primaryBirthday(p)),
 		)
 	}
 	return nil

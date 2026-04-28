@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	contactsReadMask       = "names,emailAddresses,phoneNumbers,organizations,urls"
-	contactsGetReadMask    = contactsReadMask + ",birthdays,biographies,addresses,genders,userDefined,relations,metadata"
-	contactsUpdateReadMask = contactsReadMask + ",birthdays,biographies,addresses,genders,userDefined,relations,metadata"
+	contactsReadMask       = "names,emailAddresses,phoneNumbers,birthdays,organizations,urls"
+	contactsGetReadMask    = contactsReadMask + ",biographies,addresses,genders,userDefined,relations,metadata"
+	contactsUpdateReadMask = contactsReadMask + ",biographies,addresses,genders,userDefined,relations,metadata"
 )
 
 type ContactsListCmd struct {
@@ -52,6 +52,7 @@ func (c *ContactsListCmd) Run(ctx context.Context, flags *RootFlags) error {
 			Name     string `json:"name,omitempty"`
 			Email    string `json:"email,omitempty"`
 			Phone    string `json:"phone,omitempty"`
+			Birthday string `json:"birthday,omitempty"`
 		}
 		items := make([]item, 0, len(resp.Connections))
 		for _, p := range resp.Connections {
@@ -63,6 +64,7 @@ func (c *ContactsListCmd) Run(ctx context.Context, flags *RootFlags) error {
 				Name:     primaryName(p),
 				Email:    primaryEmail(p),
 				Phone:    primaryPhone(p),
+				Birthday: primaryBirthday(p),
 			})
 		}
 		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
@@ -77,16 +79,17 @@ func (c *ContactsListCmd) Run(ctx context.Context, flags *RootFlags) error {
 
 	w, flush := tableWriter(ctx)
 	defer flush()
-	fmt.Fprintln(w, "RESOURCE\tNAME\tEMAIL\tPHONE")
+	fmt.Fprintln(w, "RESOURCE\tNAME\tEMAIL\tPHONE\tBIRTHDAY")
 	for _, p := range resp.Connections {
 		if p == nil {
 			continue
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 			p.ResourceName,
 			sanitizeTab(primaryName(p)),
 			sanitizeTab(primaryEmail(p)),
 			sanitizeTab(primaryPhone(p)),
+			sanitizeTab(primaryBirthday(p)),
 		)
 	}
 

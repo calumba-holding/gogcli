@@ -317,6 +317,9 @@ Flag aliases:
 - `gog contacts search <query> [--max N]`
 - `gog contacts list [--max N] [--page TOKEN]`
 - `gog contacts get <people/...|email>`
+- `gog contacts export <people/...|email|name> [--out PATH|-]`
+- `gog contacts export --query <query> [--max N] [--out PATH|-]`
+- `gog contacts export --all [--page-size N] [--page TOKEN] [--out PATH|-]`
 - `gog contacts create --given NAME [--family NAME] [--email addr] [--phone num] [--relation type=person]`
 - `gog contacts update <people/...> [--given NAME] [--family NAME] [--email addr] [--phone num] [--birthday YYYY-MM-DD] [--notes TEXT] [--relation type=person] [--from-file PATH|-] [--ignore-etag]`
 - `gog contacts delete <people/...>`

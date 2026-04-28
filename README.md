@@ -1093,6 +1093,8 @@ gog contacts list --max 50
 gog contacts search "Ada" --max 50
 gog contacts get people/<resourceName>
 gog contacts get user@example.com     # Get by email
+gog contacts export user@example.com --out contact.vcf
+gog contacts export --all --out contacts.vcf
 
 # Other contacts (people you've interacted with)
 gog contacts other list --max 50

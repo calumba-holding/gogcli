@@ -191,6 +191,7 @@ Generated from `gog schema --json`.
 - `gog contacts (contact) directory <command>` - Directory contacts
 - `gog contacts (contact) directory list [flags]` - List people from the Workspace directory
 - `gog contacts (contact) directory search <query> ... [flags]` - Search people in the Workspace directory
+- `gog contacts (contact) export [<selector>] [flags]` - Export contacts as vCard (.vcf)
 - `gog contacts (contact) get (info,show) <resourceName>` - Get a contact
 - `gog contacts (contact) list (ls) [flags]` - List contacts
 - `gog contacts (contact) other <command>` - Other contacts
