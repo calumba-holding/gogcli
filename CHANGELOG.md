@@ -34,6 +34,7 @@
 - Gmail: auto-fill draft reply subjects from the original message when `gmail drafts create --reply-to-message-id` omits `--subject`. (#488) — thanks @jbowerbir.
 - Gmail: fall back to the People profile name for primary-account `From` headers when Gmail send-as settings omit a display name. (#431) — thanks @moeedahmed.
 - Gmail: reuse the shared paginated list runner for thread and message search so `--all`, `--page`, text, and JSON output stay consistent.
+- Gmail: clarify that `gmail batch delete` is permanent and point default-scope workflows at `gmail trash`. (#151)
 - Drive: print large upload progress to stderr while keeping JSON output parseable. (#529)
 - Drive: include `hasThumbnail` and `thumbnailLink` in `drive ls`, `drive search`, and `drive get` JSON responses. (#486) — thanks @gtapps.
 - Secrets: time out macOS Keychain read/write/list operations with a clear recovery hint instead of hanging indefinitely when a permission prompt cannot surface. (#515, #513) — thanks @sardoru.
