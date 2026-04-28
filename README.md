@@ -117,6 +117,7 @@ Before adding an account, create OAuth2 credentials from Google Cloud Console:
    If Google returns `accessNotConfigured` or says an API has not been used in the project, enable the API in the same Cloud project that owns your OAuth client JSON, then retry after the enablement propagates.
 3. Configure OAuth consent screen: https://console.cloud.google.com/auth/branding
 4. If your app is in "Testing", add test users: https://console.cloud.google.com/auth/audience
+   - Testing-mode refresh tokens expire after 7 days for External apps that request Gmail/Drive/Calendar-style user-data scopes. For a personal consumer Gmail account, publish the OAuth app for long-lived refresh tokens; a small personal/unverified app can still show Google's unverified-app warning and user cap. Staying in Testing means re-authenticating every 7 days.
 5. Create OAuth client:
    - Go to https://console.cloud.google.com/auth/clients
    - Click "Create Client"
@@ -623,6 +624,8 @@ Some open source Google CLIs ship a pre-configured OAuth client ID/secret copied
 
 - Your own OAuth Desktop client JSON via `gog auth credentials ...` + `gog auth add ...`
 - Google Workspace service accounts with domain-wide delegation (Workspace only)
+
+For consumer Gmail accounts, there is no `gogcli` workaround for Google's OAuth publishing status. If the OAuth app is External + Testing and requests Gmail or other user-data scopes, Google expires the refresh token after 7 days. To avoid weekly re-auth, move the OAuth app to production/published status; for personal use under Google's unverified-app cap, this can still work without shipping a public app. Workspace Internal apps and service-account delegation only help Workspace-owned accounts, not `@gmail.com` mailboxes.
 
 ## Commands
 
