@@ -32,6 +32,7 @@ type KeyringStore struct {
 
 type Token struct {
 	Client       string    `json:"client,omitempty"`
+	Subject      string    `json:"subject,omitempty"`
 	Email        string    `json:"email"`
 	Services     []string  `json:"services,omitempty"`
 	Scopes       []string  `json:"scopes,omitempty"`
@@ -358,6 +359,8 @@ func (s *KeyringStore) Keys() ([]string, error) {
 
 type storedToken struct {
 	RefreshToken string    `json:"refresh_token"`
+	Subject      string    `json:"subject,omitempty"`
+	Email        string    `json:"email,omitempty"`
 	Services     []string  `json:"services,omitempty"`
 	Scopes       []string  `json:"scopes,omitempty"`
 	CreatedAt    time.Time `json:"created_at,omitempty"`
@@ -381,9 +384,18 @@ func (s *KeyringStore) SetToken(client string, email string, tok Token) error {
 	if tok.CreatedAt.IsZero() {
 		tok.CreatedAt = time.Now().UTC()
 	}
+	tok.Subject = strings.TrimSpace(tok.Subject)
+	tok.Email = email
+
+	oldSubject := ""
+	if existing, getErr := s.GetToken(normalizedClient, email); getErr == nil {
+		oldSubject = strings.TrimSpace(existing.Subject)
+	}
 
 	payload, err := json.Marshal(storedToken{ //nolint:gosec // persisted token schema intentionally includes refresh_token
 		RefreshToken: tok.RefreshToken,
+		Subject:      tok.Subject,
+		Email:        tok.Email,
 		Services:     tok.Services,
 		Scopes:       tok.Scopes,
 		CreatedAt:    tok.CreatedAt,
@@ -412,6 +424,18 @@ func (s *KeyringStore) SetToken(client string, email string, tok Token) error {
 	if normalizedClient == config.DefaultClientName {
 		if err := s.ring.Set(keyringItem(legacyTokenKey(email), payload)); err != nil {
 			return wrapKeychainError(fmt.Errorf("store legacy token: %w", err))
+		}
+	}
+
+	if tok.Subject != "" {
+		if err := s.ring.Set(keyringItem(subjectTokenKey(normalizedClient, tok.Subject), payload)); err != nil {
+			return wrapKeychainError(fmt.Errorf("store subject token: %w", err))
+		}
+	}
+
+	if oldSubject != "" && oldSubject != tok.Subject {
+		if err := s.ring.Remove(subjectTokenKey(normalizedClient, oldSubject)); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
+			return fmt.Errorf("delete stale subject token: %w", err)
 		}
 	}
 
@@ -452,7 +476,8 @@ func (s *KeyringStore) GetToken(client string, email string) (Token, error) {
 
 	return Token{
 		Client:       normalizedClient,
-		Email:        email,
+		Subject:      strings.TrimSpace(st.Subject),
+		Email:        storedEmailOrFallback(st.Email, email),
 		Services:     st.Services,
 		Scopes:       st.Scopes,
 		CreatedAt:    st.CreatedAt,
@@ -471,6 +496,11 @@ func (s *KeyringStore) DeleteToken(client string, email string) error {
 		return err
 	}
 
+	var subject string
+	if tok, getErr := s.GetToken(normalizedClient, email); getErr == nil {
+		subject = strings.TrimSpace(tok.Subject)
+	}
+
 	if err := s.ring.Remove(tokenKey(normalizedClient, email)); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
 		return fmt.Errorf("delete token: %w", err)
 	}
@@ -478,6 +508,12 @@ func (s *KeyringStore) DeleteToken(client string, email string) error {
 	if normalizedClient == config.DefaultClientName {
 		if err := s.ring.Remove(legacyTokenKey(email)); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
 			return fmt.Errorf("delete legacy token: %w", err)
+		}
+	}
+
+	if subject != "" {
+		if err := s.ring.Remove(subjectTokenKey(normalizedClient, subject)); err != nil && !errors.Is(err, keyring.ErrKeyNotFound) {
+			return fmt.Errorf("delete subject token: %w", err)
 		}
 	}
 
@@ -494,23 +530,46 @@ func (s *KeyringStore) ListTokens() ([]Token, error) {
 
 	for _, k := range keys {
 		client, email, ok := ParseTokenKey(k)
+		var subject string
+
 		if !ok {
-			continue
+			if parsedClient, parsedSubject, subjectOK := parseSubjectTokenKey(k); subjectOK {
+				client = parsedClient
+				subject = parsedSubject
+			} else {
+				continue
+			}
 		}
 
 		key := client + "\n" + email
+		if subject != "" {
+			key = client + "\nsub:" + subject
+		}
+
 		if _, ok := seen[key]; ok {
 			continue
 		}
 
 		var tok Token
 
-		if t, err := s.GetToken(client, email); err != nil {
+		if subject != "" {
+			t, err := s.getTokenBySubject(client, subject)
+			if err != nil {
+				return nil, fmt.Errorf("read token for subject %s: %w", subject, err)
+			}
+			tok = t
+		} else if t, err := s.GetToken(client, email); err != nil {
 			return nil, fmt.Errorf("read token for %s: %w", email, err)
 		} else {
 			tok = t
 		}
 
+		if tok.Subject != "" {
+			key = tok.Client + "\nsub:" + tok.Subject
+			if _, ok := seen[key]; ok {
+				continue
+			}
+		}
 		seen[key] = struct{}{}
 
 		out = append(out, tok)
@@ -550,12 +609,76 @@ func tokenKey(client string, email string) string {
 	return fmt.Sprintf("token:%s:%s", client, email)
 }
 
+func subjectTokenKey(client string, subject string) string {
+	return fmt.Sprintf("token-sub:%s:%s", client, strings.TrimSpace(subject))
+}
+
 func legacyTokenKey(email string) string {
 	return fmt.Sprintf("token:%s", email)
 }
 
 func TokenKey(client string, email string) string {
 	return tokenKey(client, normalize(email))
+}
+
+func parseSubjectTokenKey(k string) (client string, subject string, ok bool) {
+	const prefix = "token-sub:"
+	if !strings.HasPrefix(k, prefix) {
+		return "", "", false
+	}
+
+	rest := strings.TrimPrefix(k, prefix)
+	parts := strings.SplitN(rest, ":", 2)
+
+	if len(parts) != 2 {
+		return "", "", false
+	}
+
+	if strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+		return "", "", false
+	}
+
+	return parts[0], parts[1], true
+}
+
+func (s *KeyringStore) getTokenBySubject(client string, subject string) (Token, error) {
+	normalizedClient, err := normalizeClient(client)
+	if err != nil {
+		return Token{}, err
+	}
+
+	subject = strings.TrimSpace(subject)
+	if subject == "" {
+		return Token{}, errMissingEmail
+	}
+
+	item, err := s.ring.Get(subjectTokenKey(normalizedClient, subject))
+	if err != nil {
+		return Token{}, fmt.Errorf("read token: %w", err)
+	}
+
+	var st storedToken
+	if err := json.Unmarshal(item.Data, &st); err != nil {
+		return Token{}, fmt.Errorf("decode token: %w", err)
+	}
+
+	return Token{
+		Client:       normalizedClient,
+		Subject:      strings.TrimSpace(st.Subject),
+		Email:        storedEmailOrFallback(st.Email, ""),
+		Services:     st.Services,
+		Scopes:       st.Scopes,
+		CreatedAt:    st.CreatedAt,
+		RefreshToken: st.RefreshToken,
+	}, nil
+}
+
+func storedEmailOrFallback(stored string, fallback string) string {
+	if email := normalize(stored); email != "" {
+		return email
+	}
+
+	return normalize(fallback)
 }
 
 func normalize(s string) string {

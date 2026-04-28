@@ -94,6 +94,7 @@ Before adding an account, create OAuth2 credentials from Google Cloud Console:
    - Google Sheets API: https://console.cloud.google.com/apis/api/sheets.googleapis.com
    - Google Forms API: https://console.cloud.google.com/apis/api/forms.googleapis.com
    - Google Slides API: https://console.cloud.google.com/apis/api/slides.googleapis.com
+   If Google returns `accessNotConfigured` or says an API has not been used in the project, enable the API in the same Cloud project that owns your OAuth client JSON, then retry after the enablement propagates.
 3. Configure OAuth consent screen: https://console.cloud.google.com/auth/branding
 4. If your app is in "Testing", add test users: https://console.cloud.google.com/auth/audience
 5. Create OAuth client:
@@ -202,6 +203,8 @@ Diagnose keyring/password drift and refresh-token failures:
 gog auth doctor
 gog auth doctor --check
 ```
+
+OAuth tokens store Google's stable OIDC subject (`sub`) alongside the account email. If Google renames an account email, re-authorizing the new address migrates matching subject-keyed tokens, aliases, client mappings, and defaults instead of orphaning the old email entry.
 
 Accounts can be authorized either via OAuth refresh tokens or Workspace service accounts (domain-wide delegation). If a service account key is configured for an account, it takes precedence over OAuth refresh tokens (see `gog auth list`).
 
@@ -768,9 +771,11 @@ message shards from cached messages instead of keeping the whole mailbox in
 memory; progress is written to stderr while stdout stays parseable. Cached
 Gmail runs also push incomplete encrypted checkpoint commits during long fetches
 by default (`--gmail-checkpoint-rows`, `--gmail-checkpoint-interval`,
-`--no-gmail-checkpoints`). Checkpoints live under `checkpoints/` and do not
-replace the authoritative `manifest.json` until the final backup completes. Use
-`--gmail-refresh-cache` to force a refetch. Workspace inventories
+`--no-gmail-checkpoints`). Checkpoint files are split by row count and a
+conservative plaintext byte ceiling to avoid GitHub blob rejections.
+Checkpoints live under `checkpoints/` and do not replace the authoritative
+`manifest.json` until the final backup completes. Use `--gmail-refresh-cache`
+to force a refetch. Workspace inventories
 Docs/Sheets/Slides and backs up Forms/responses discovered through Drive; add
 `--workspace-native` for full native Docs/Sheets/Slides API JSON.
 Optional Workspace-only services use `--best-effort` by default, recording
@@ -1469,6 +1474,22 @@ gog slides create-from-template <templateId> "Q1 Report" \
   --replace "revenue=$1.2M" \
   --replace "growth=15%"
 
+# Create from Markdown
+cat > slides.md <<'EOF'
+## Roadmap
+
+- Ship auth migration
+- Polish backup restore
+
+---
+
+## Launch Notes
+
+Short paragraphs become body text.
+EOF
+
+gog slides create-from-markdown "Roadmap" --content-file ./slides.md
+
 # Use JSON file for many replacements
 cat > replacements.json <<EOF
 {
@@ -1524,6 +1545,8 @@ gog slides replace-text <presentationId> "TODO" "DONE" \
 # Preview the replace request without executing it
 gog slides replace-text <presentationId> "old" "new" --dry-run
 ```
+
+`slides create-from-markdown` uses `---` lines as slide separators and `##` headings as slide titles. It supports bullets, paragraphs, and fenced code blocks; see [docs/slides-markdown.md](docs/slides-markdown.md).
 
 ## Output Formats
 

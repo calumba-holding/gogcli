@@ -13,12 +13,14 @@
 - Drive: add `drive search --drive` and `--parent` for scoping search to a shared drive or folder. (#525) — thanks @LeanSheng.
 - Gmail: add `gmail messages search --body-format html` for returning HTML message bodies when `--include-body` is used. (#520) — thanks @alexknowshtml.
 - Slides: add `slides insert-text` and `slides replace-text` for editing existing slide text elements and replacing template tokens. (#521) — thanks @chrissanchez-iops.
+- Slides docs: document the Markdown structure accepted by `slides create-from-markdown`. (#497)
 - Contacts: add `contacts export` for vCard 4.0 `.vcf` exports by resource, email/name search, or all contacts, including best-effort label categories. (#519, #500) — thanks @dinakars777.
 - Contacts: include birthdays in `contacts list` and `contacts search` text and JSON output. (#441)
 - Auth: add `gog auth doctor` to diagnose keyring backend/password drift, unreadable file-keyring tokens, and refresh-token failures such as Workspace `invalid_rapt`. (#377, #338)
 
 ### Fixed
-- Backup: split Gmail checkpoint commits into smaller encrypted shard files so large messages stay below GitHub's blob limit.
+- Backup: split Gmail checkpoint commits by row count and plaintext byte size so large messages stay below GitHub's blob limit.
+- Auth: store Google OIDC `sub` claims with OAuth tokens and migrate matching subject-keyed accounts when a Google email rename is reauthorized. (#504)
 - Calendar: display `calendar events` times and JSON local fields in the calendar timezone instead of preserving arbitrary event offsets. (#493)
 - Drive/Docs/Sheets/Slides: treat `--out -` as stdout for downloads and exports instead of creating `-`/`-.ext` files; reject `--json --out -` to keep byte streams parseable. (#286)
 - Docs: deprecate editing-command `--tab-id` in favor of `--tab`, and resolve tab titles to canonical tab IDs before mutations. (#533) — thanks @johnbenjaminlewis.

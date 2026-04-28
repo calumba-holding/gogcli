@@ -282,8 +282,8 @@ func TestManageServerHandleOAuthCallback_FetchEmailError(t *testing.T) {
 		oauthState: "state1",
 		listener:   ln,
 		store:      &fakeStore{},
-		fetchEmail: func(context.Context, *oauth2.Token) (string, error) {
-			return "", errTestStoreBoom
+		fetchIdentity: func(context.Context, *oauth2.Token) (Identity, error) {
+			return Identity{}, errTestStoreBoom
 		},
 		opts: ManageServerOptions{Services: []Service{ServiceGmail}},
 	}

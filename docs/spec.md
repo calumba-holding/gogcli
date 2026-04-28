@@ -91,8 +91,10 @@ Implementation: `internal/config/*`.
 - Stored in OS credential store via `github.com/99designs/keyring`.
 - Key namespace is `gogcli` by default (keyring `ServiceName`); override with `GOG_KEYRING_SERVICE_NAME`.
 - Key format: `token:<client>:<email>` (default client uses `token:default:<email>`)
+- Canonical identity key format for new tokens with an OIDC subject: `token-sub:<client>:<sub>`. Email-keyed entries remain as compatibility lookup keys.
 - Legacy key format: `token:<email>` (migrated on first read)
-- Stored payload is JSON (refresh token + metadata like selected services/scopes).
+- Stored payload is JSON (refresh token + metadata like OIDC subject, current email, selected services/scopes).
+- Email is treated as display/contact state; Google's OIDC `sub` is used to detect the same account after an email rename and migrate aliases/defaults/client mappings on reauthorization.
 - macOS Keychain operations are bounded by a timeout so non-surfacing permission prompts return actionable guidance instead of hanging indefinitely.
 - Fallback: if no OS credential store is available, keyring may use its encrypted "file" backend:
   - Directory: `$(os.UserConfigDir())/gogcli/keyring/` (one file per key; gog-managed key names are encoded for portable filenames)

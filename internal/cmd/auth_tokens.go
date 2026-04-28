@@ -136,6 +136,7 @@ func (c *AuthTokensExportCmd) Run(ctx context.Context, _ *RootFlags) error {
 
 	type export struct {
 		Email        string   `json:"email"`
+		Subject      string   `json:"subject,omitempty"`
 		Client       string   `json:"client,omitempty"`
 		Services     []string `json:"services,omitempty"`
 		Scopes       []string `json:"scopes,omitempty"`
@@ -152,6 +153,7 @@ func (c *AuthTokensExportCmd) Run(ctx context.Context, _ *RootFlags) error {
 	enc.SetIndent("", "  ")
 	if encErr := enc.Encode(export{ //nolint:gosec // explicit token export writes the requested refresh token payload
 		Email:        tok.Email,
+		Subject:      tok.Subject,
 		Client:       client,
 		Services:     tok.Services,
 		Scopes:       tok.Scopes,
@@ -201,6 +203,7 @@ func (c *AuthTokensImportCmd) Run(ctx context.Context, _ *RootFlags) error {
 
 	type export struct {
 		Email        string   `json:"email"`
+		Subject      string   `json:"subject,omitempty"`
 		Client       string   `json:"client,omitempty"`
 		Services     []string `json:"services,omitempty"`
 		Scopes       []string `json:"scopes,omitempty"`
@@ -246,6 +249,7 @@ func (c *AuthTokensImportCmd) Run(ctx context.Context, _ *RootFlags) error {
 
 	if err := store.SetToken(client, ex.Email, secrets.Token{
 		Client:       client,
+		Subject:      strings.TrimSpace(ex.Subject),
 		Email:        ex.Email,
 		Services:     ex.Services,
 		Scopes:       ex.Scopes,

@@ -187,6 +187,7 @@ func (c *AuthListCmd) Run(ctx context.Context, _ *RootFlags) error {
 	if outfmt.IsJSON(ctx) {
 		type item struct {
 			Email     string   `json:"email"`
+			Subject   string   `json:"subject,omitempty"`
 			Client    string   `json:"client,omitempty"`
 			Services  []string `json:"services,omitempty"`
 			Scopes    []string `json:"scopes,omitempty"`
@@ -232,6 +233,7 @@ func (c *AuthListCmd) Run(ctx context.Context, _ *RootFlags) error {
 			}
 			if e.Token != nil {
 				it.Client = e.Token.Client
+				it.Subject = e.Token.Subject
 			}
 			if c.Check {
 				if e.Token == nil {

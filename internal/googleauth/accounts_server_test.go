@@ -611,8 +611,8 @@ func TestManageServer_HandleOAuthCallback_Success(t *testing.T) {
 		oauthState: "state1",
 		listener:   ln,
 		store:      store,
-		fetchEmail: func(ctx context.Context, tok *oauth2.Token) (string, error) {
-			return fetchUserEmailWithURL(ctx, tok.AccessToken, userinfoSrv.URL+"/oauth2/v2/userinfo")
+		fetchIdentity: func(ctx context.Context, tok *oauth2.Token) (Identity, error) {
+			return fetchUserIdentityWithURL(ctx, tok.AccessToken, userinfoSrv.URL+"/oauth2/v2/userinfo")
 		},
 		opts: ManageServerOptions{Services: []Service{ServiceGmail}},
 	}
@@ -687,8 +687,8 @@ func TestManageServer_HandleOAuthCallback_FileBackendSkipsKeychain(t *testing.T)
 		oauthState: "state1",
 		listener:   ln,
 		store:      store,
-		fetchEmail: func(ctx context.Context, tok *oauth2.Token) (string, error) {
-			return "me@example.com", nil
+		fetchIdentity: func(ctx context.Context, tok *oauth2.Token) (Identity, error) {
+			return Identity{Email: "me@example.com"}, nil
 		},
 		opts: ManageServerOptions{Services: []Service{ServiceGmail}},
 	}
@@ -840,7 +840,7 @@ func TestEmailFromIDToken(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		idToken := strings.Join([]string{
 			base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`)),
-			base64.RawURLEncoding.EncodeToString([]byte(`{"email":"me@example.com"}`)),
+			base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"sub-123","email":"me@example.com"}`)),
 			"",
 		}, ".")
 
@@ -851,6 +851,15 @@ func TestEmailFromIDToken(t *testing.T) {
 
 		if email != "me@example.com" {
 			t.Fatalf("expected me@example.com, got %q", email)
+		}
+
+		identity, err := identityFromIDToken(idToken)
+		if err != nil {
+			t.Fatalf("identityFromIDToken: %v", err)
+		}
+
+		if identity.Subject != "sub-123" || identity.Email != "me@example.com" {
+			t.Fatalf("unexpected identity: %#v", identity)
 		}
 	})
 
