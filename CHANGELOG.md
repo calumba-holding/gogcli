@@ -12,6 +12,7 @@
 - Backup: push Gmail checkpoint commits through a single ordered background queue so cached fetches continue while GitHub uploads run.
 - Calendar: add `--start-timezone` / `--end-timezone` to `calendar create` and `calendar update` for preserving named IANA event timezones when RFC3339 inputs only carry numeric offsets. (#422)
 - Drive: add `drive search --drive` and `--parent` for scoping search to a shared drive or folder. (#525) — thanks @LeanSheng.
+- Docs: add experimental `docs export --tab` / `drive download --tab` to export a single Google Docs tab as PDF, DOCX, text, Markdown, or HTML. (#535) — thanks @johnbenjaminlewis.
 - Gmail: add `gmail messages search --body-format html` for returning HTML message bodies when `--include-body` is used. (#520) — thanks @alexknowshtml.
 - Slides: add `slides insert-text` and `slides replace-text` for editing existing slide text elements and replacing template tokens. (#521) — thanks @chrissanchez-iops.
 - Slides docs: document the Markdown structure accepted by `slides create-from-markdown`. (#497)

@@ -20,6 +20,8 @@ Each service command is a thin wrapper:
 - `gog slides export <presentationId> --format pdf|pptx`
 - `gog sheets export <spreadsheetId> --format pdf|xlsx|csv`
 
+Exception: `gog docs export --tab <title-or-id>` exports a single Google Docs tab through the undocumented Docs web export endpoint because Drive `files.export` only exports the whole document. Keep it marked experimental, preserve `--out -` raw-byte semantics, and reject auth redirects to Google sign-in hosts before writing bytes.
+
 ## Conventions
 
 - Arg is always the Drive file id (Doc/Sheet/Slides id).

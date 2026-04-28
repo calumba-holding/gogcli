@@ -1055,6 +1055,7 @@ gog docs create "My Doc" --file ./doc.md            # Import markdown
 gog docs create "My Doc" --pageless
 gog docs copy <docId> "My Doc Copy"
 gog docs export <docId> --format pdf --out ./doc.pdf
+gog docs export <docId> --tab "Notes" --format pdf --out ./notes.pdf
 gog docs export <docId> --format txt --out - > doc.txt
 gog docs list-tabs <docId>
 gog docs cat <docId> --tab "Notes"
@@ -1441,6 +1442,7 @@ gog docs export <docId> --format txt --out ./doc.txt
 gog docs export <docId> --format md --out ./doc.md
 gog docs export <docId> --format html --out ./doc.html
 gog docs export <docId> --format txt --out - > doc.txt
+gog docs export <docId> --tab "Notes" --format md --out ./notes.md
 
 # Sed-style regex editing with Markdown formatting (sedmat)
 gog docs sed <docId> 's/pattern/replacement/g'

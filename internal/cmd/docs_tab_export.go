@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -42,6 +43,9 @@ func googleExportRedirectPolicy(req *http.Request, via []*http.Request) error {
 	if len(via) >= maxRedirects {
 		return errors.New("too many redirects")
 	}
+	if len(via) > 0 && isGoogleAuthHost(req.URL.Host) {
+		return fmt.Errorf("refusing redirect from %s to Google sign-in host %s (try re-authenticating with 'gog auth login')", via[0].URL.Host, req.URL.Host)
+	}
 	if len(via) > 0 && !isGoogleHost(req.URL.Host) {
 		return fmt.Errorf("refusing redirect from %s to non-Google host %s (possible auth redirect; try re-authenticating)", via[0].URL.Host, req.URL.Host)
 	}
@@ -49,12 +53,18 @@ func googleExportRedirectPolicy(req *http.Request, via []*http.Request) error {
 }
 
 func isGoogleHost(host string) bool {
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
 	for _, suffix := range []string{".google.com", ".googleusercontent.com", ".googleapis.com"} {
 		if host == suffix[1:] || strings.HasSuffix(host, suffix) {
 			return true
 		}
 	}
 	return false
+}
+
+func isGoogleAuthHost(host string) bool {
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	return host == "accounts.google.com" || host == "myaccount.google.com"
 }
 
 type tabExportParams struct {
@@ -76,6 +86,7 @@ func sanitizeFilenameComponent(s string) string {
 const formatHTML = "html"
 
 func tabExportFormatParam(format string) (string, error) {
+	format = strings.ToLower(strings.TrimSpace(format))
 	switch format {
 	case "pdf", "docx", "txt", formatHTML:
 		return format, nil
@@ -153,6 +164,7 @@ func runDocsTabExport(ctx context.Context, flags *RootFlags, p tabExportParams) 
 	if format == "" || format == formatAuto {
 		format = "pdf"
 	}
+	format = strings.ToLower(strings.TrimSpace(format))
 
 	formatParam, fmtErr := tabExportFormatParam(format)
 	if fmtErr != nil {
@@ -162,6 +174,9 @@ func runDocsTabExport(ctx context.Context, flags *RootFlags, p tabExportParams) 
 	outPath, pathErr := tabExportOutPath(p.OutFlag, p.DocID, p.TabQuery, format)
 	if pathErr != nil {
 		return pathErr
+	}
+	if outfmt.IsJSON(ctx) && isStdoutPath(outPath) {
+		return usage("can't combine --json with --out -")
 	}
 
 	if dryErr := dryRunExit(ctx, flags, "docs.tab-export", map[string]any{
@@ -208,6 +223,11 @@ func runDocsTabExport(ctx context.Context, flags *RootFlags, p tabExportParams) 
 		return checkErr
 	}
 
+	if isStdoutPath(outPath) {
+		_, copyErr := io.Copy(os.Stdout, resp.Body)
+		return copyErr
+	}
+
 	f, outPath, writeErr := createUserOutputFile(outPath)
 	if writeErr != nil {
 		return writeErr
@@ -229,7 +249,11 @@ func runDocsTabExport(ctx context.Context, flags *RootFlags, p tabExportParams) 
 
 func checkTabExportResponse(resp *http.Response, format string) error {
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		if ct := resp.Header.Get("Content-Type"); format != formatHTML && strings.HasPrefix(ct, "text/html") {
+		mediaType := strings.ToLower(resp.Header.Get("Content-Type"))
+		if parsed, _, err := mime.ParseMediaType(mediaType); err == nil {
+			mediaType = parsed
+		}
+		if format != formatHTML && mediaType == "text/html" {
 			snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 			return fmt.Errorf("tab export returned unexpected text/html (possible auth redirect; try 'gog auth login'): %s", strings.TrimSpace(string(snippet)))
 		}

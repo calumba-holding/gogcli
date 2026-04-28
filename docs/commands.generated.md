@@ -215,7 +215,7 @@ Generated from `gog schema --json`.
 - `gog docs (doc) create (add,new) <title> [flags]` - Create a Google Doc
 - `gog docs (doc) delete --start=INT-64 --end=INT-64 <docId> [flags]` - Delete text range from document
 - `gog docs (doc) edit <docId> <find> <replace> [flags]` - Find and replace text in a Google Doc
-- `gog docs (doc) export (download,dl) <docId> [flags]` - Export a Google Doc (pdf|docx|txt|md)
+- `gog docs (doc) export (download,dl) <docId> [flags]` - Export a Google Doc (pdf|docx|txt|md|html)
 - `gog docs (doc) find-replace <docId> <find> [<replace>] [flags]` - Find and replace text. Supports plain text or markdown with images; use --first for a single occurrence.
 - `gog docs (doc) info (get,show) <docId>` - Get Google Doc metadata
 - `gog docs (doc) insert <docId> [<content>] [flags]` - Insert text at a specific position
@@ -268,8 +268,8 @@ Generated from `gog schema --json`.
 - `gog gmail (mail,email) archive [<messageId> ...] [flags]` - Archive messages (remove from inbox)
 - `gog gmail (mail,email) attachment <messageId> <attachmentId> [flags]` - Download a single attachment
 - `gog gmail (mail,email) autoreply <query> ... [flags]` - Reply once to matching messages
-- `gog gmail (mail,email) batch <command>` - Batch operations
-- `gog gmail (mail,email) batch delete (rm,del,remove) <messageId> ...` - Permanently delete multiple messages
+- `gog gmail (mail,email) batch <command>` - Batch operations (permanent delete requires broader Gmail scope; use gmail trash for normal trashing)
+- `gog gmail (mail,email) batch delete (rm,del,remove) <messageId> ...` - Permanently delete multiple messages; use 'gmail trash' to move messages to trash with the default gmail.modify scope
 - `gog gmail (mail,email) batch modify (update,edit,set) <messageId> ... [flags]` - Modify labels on multiple messages
 - `gog gmail (mail,email) drafts (draft) <command>` - Draft operations
 - `gog gmail (mail,email) drafts (draft) create (add,new) [flags]` - Create a draft

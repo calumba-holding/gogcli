@@ -79,6 +79,7 @@ func TestTabExportFormatParam(t *testing.T) {
 		wantErr bool
 	}{
 		{"pdf", "pdf", false},
+		{"PDF", "pdf", false},
 		{"docx", "docx", false},
 		{"txt", "txt", false},
 		{"md", "markdown", false},
@@ -114,6 +115,7 @@ func TestGoogleExportRedirectPolicy(t *testing.T) {
 		{"same host", "https://docs.google.com/other", ""},
 		{"googleusercontent", "https://doc-04-0k-docstext.googleusercontent.com/export/abc", ""},
 		{"googleapis", "https://storage.googleapis.com/bucket/file", ""},
+		{"google sign-in", "https://accounts.google.com/v3/signin/identifier", "Google sign-in host"},
 		{"non-google host", "https://evil.example.com/steal", "non-Google host"},
 	}
 	for _, tt := range tests {
@@ -274,7 +276,7 @@ func TestRunDocsTabExport(t *testing.T) {
 
 func TestRunDocsTabExport_HTMLRedirectGuard(t *testing.T) {
 	stubTabExportDeps(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Content-Type", "Text/HTML; charset=utf-8")
 		_, _ = w.Write([]byte("<html>Sign in</html>"))
 	}))
 
@@ -287,6 +289,65 @@ func TestRunDocsTabExport_HTMLRedirectGuard(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "unexpected text/html") {
 		t.Fatalf("expected HTML redirect error, got: %v", err)
+	}
+}
+
+func TestRunDocsTabExport_OutStdout(t *testing.T) {
+	stubTabExportDeps(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("tab text\n"))
+	}))
+	t.Chdir(t.TempDir())
+
+	ctx := newDocsCmdContext(t)
+	stdout := captureStdout(t, func() {
+		_ = captureStderr(t, func() {
+			err := runDocsTabExport(ctx, &RootFlags{Account: "test@example.com"}, tabExportParams{
+				DocID:    "doc1",
+				OutFlag:  "-",
+				Format:   "txt",
+				TabQuery: "First Tab",
+			})
+			if err != nil {
+				t.Fatalf("runDocsTabExport: %v", err)
+			}
+		})
+	})
+	if stdout != "tab text\n" {
+		t.Fatalf("stdout=%q, want raw export bytes", stdout)
+	}
+	if _, statErr := os.Stat("-"); !os.IsNotExist(statErr) {
+		t.Fatalf("expected no file named -, stat=%v", statErr)
+	}
+}
+
+func TestRunDocsTabExport_OutStdoutJSONRejected(t *testing.T) {
+	called := false
+	stubTabExportDeps(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("tab text\n"))
+	}))
+
+	ctx := newDocsJSONContext(t)
+	stdout := captureStdout(t, func() {
+		_ = captureStderr(t, func() {
+			err := runDocsTabExport(ctx, &RootFlags{Account: "test@example.com"}, tabExportParams{
+				DocID:    "doc1",
+				OutFlag:  "-",
+				Format:   "txt",
+				TabQuery: "First Tab",
+			})
+			if err == nil || !strings.Contains(err.Error(), "can't combine --json with --out -") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	})
+	if stdout != "" {
+		t.Fatalf("stdout=%q, want empty", stdout)
+	}
+	if called {
+		t.Fatal("export request should not be called")
 	}
 }
 
