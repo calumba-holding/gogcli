@@ -34,6 +34,8 @@ const (
 	driveMimeGoogleSheet   = "application/vnd.google-apps.spreadsheet"
 	driveMimeGoogleSlides  = "application/vnd.google-apps.presentation"
 	driveMimeGoogleDrawing = "application/vnd.google-apps.drawing"
+	driveMimeGoogleSite    = "application/vnd.google-apps.site"
+	driveQueryNotTrashed   = "trashed = false"
 	mimePDF                = "application/pdf"
 	mimeCSV                = "text/csv"
 	mimeDocx               = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -381,7 +383,7 @@ func buildDriveListQuery(folderID string, userQuery string) string {
 		q = parent
 	}
 	if !hasDriveTrashedPredicate(q) {
-		q += " and trashed = false"
+		q += " and " + driveQueryNotTrashed
 	}
 	return q
 }
@@ -389,10 +391,10 @@ func buildDriveListQuery(folderID string, userQuery string) string {
 func buildDriveAllListQuery(userQuery string) string {
 	q := strings.TrimSpace(userQuery)
 	if q == "" {
-		return "trashed = false"
+		return driveQueryNotTrashed
 	}
 	if !hasDriveTrashedPredicate(q) {
-		q += " and trashed = false"
+		q += " and " + driveQueryNotTrashed
 	}
 	return q
 }
@@ -400,13 +402,13 @@ func buildDriveAllListQuery(userQuery string) string {
 func buildDriveSearchQuery(text string, rawQuery bool) string {
 	q := strings.TrimSpace(text)
 	if q == "" {
-		return "trashed = false"
+		return driveQueryNotTrashed
 	}
 	if rawQuery {
 		return buildDriveFilterQuery(q)
 	}
 	if !looksLikeDriveQueryLanguage(q) {
-		return fmt.Sprintf("fullText contains '%s' and trashed = false", escapeDriveQueryString(q))
+		return fmt.Sprintf("fullText contains '%s' and %s", escapeDriveQueryString(q), driveQueryNotTrashed)
 	}
 	return buildDriveFilterQuery(q)
 }
@@ -414,10 +416,10 @@ func buildDriveSearchQuery(text string, rawQuery bool) string {
 func buildDriveFilterQuery(q string) string {
 	q = strings.TrimSpace(q)
 	if q == "" {
-		return "trashed = false"
+		return driveQueryNotTrashed
 	}
 	if !hasDriveTrashedPredicate(q) {
-		q += " and trashed = false"
+		q += " and " + driveQueryNotTrashed
 	}
 	return q
 }
@@ -448,8 +450,19 @@ func escapeDriveQueryString(s string) string {
 }
 
 func driveType(mimeType string) string {
-	if mimeType == driveMimeFolder {
+	switch mimeType {
+	case driveMimeFolder:
 		return "folder"
+	case driveMimeGoogleDoc:
+		return "doc"
+	case driveMimeGoogleSheet:
+		return "sheet"
+	case driveMimeGoogleSlides:
+		return "slide"
+	case driveMimeGoogleDrawing:
+		return "drawing"
+	case driveMimeGoogleSite:
+		return "site"
 	}
 	return strFile
 }
