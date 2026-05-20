@@ -43,6 +43,24 @@ Command page:
 
 - [`gog docs format`](commands/gog-docs-format.md)
 
+## Page Breaks
+
+Markdown has no native page-break construct, so multi-page deliverables need a
+direct Docs API call. Insert a page break at a specific index or append one at
+end-of-doc:
+
+```bash
+gog docs insert-page-break <docId> --at-end
+gog docs insert-page-break <docId> --index 250 --tab "Notes"
+```
+
+`--index` and `--at-end` are mutually exclusive; omit both to default to
+end-of-doc. Aliases: `page-break`, `pb`.
+
+Command page:
+
+- [`gog docs insert-page-break`](commands/gog-docs-insert-page-break.md)
+
 ## Tabs
 
 Manage Google Docs tabs:

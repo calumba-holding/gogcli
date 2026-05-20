@@ -238,6 +238,7 @@ Generated from `gog schema --json`.
     - [`gog docs (doc) format <docId> [flags]`](commands/gog-docs-format.md) - Apply text or paragraph formatting to a Google Doc
     - [`gog docs (doc) info (get,show) <docId>`](commands/gog-docs-info.md) - Get Google Doc metadata
     - [`gog docs (doc) insert <docId> [<content>] [flags]`](commands/gog-docs-insert.md) - Insert text at a specific position
+    - [`gog docs (doc) insert-page-break (page-break,pb) <docId> [flags]`](commands/gog-docs-insert-page-break.md) - Insert a page break at a specific position (or end-of-doc with --at-end)
     - [`gog docs (doc) list-tabs <docId>`](commands/gog-docs-list-tabs.md) - List all tabs in a Google Doc
     - [`gog docs (doc) raw <docId> [flags]`](commands/gog-docs-raw.md) - Dump raw Google Docs API response as JSON (Documents.Get; lossless; for scripting and LLM consumption)
     - [`gog docs (doc) rename-tab <docId> [flags]`](commands/gog-docs-rename-tab.md) - Rename a tab in a Google Doc

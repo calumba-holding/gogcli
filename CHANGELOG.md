@@ -7,6 +7,7 @@
 - Docs: add `VISION.md` with project fit, discussion, and live-test merge guidance.
 - Calendar: add --with-zoom / --regenerate-zoom / --remove-zoom that create, regenerate, and remove Zoom meetings and attach the join URL + meeting ID + passcode to the Calendar event description. Google's Calendar API rejects conferenceData writes asserting `conferenceSolution.key.type="addOn"` from non-Workspace-Marketplace OAuth clients, so the description-mode integration is the path that round-trips through Google's storage; trade-off is no native "Join with Zoom" conference card. (#589, #590) — thanks @alexisperumal and @mvanhorn.
 - Auth: add gog zoom auth setup / doctor for Zoom S2S OAuth credential storage. (#590) — thanks @mvanhorn.
+- Docs: add `gog docs insert-page-break <docId> [--index N | --at-end] [--tab=STRING]` to insert a Google Docs page break directly via `InsertPageBreakRequest` — markdown has no native page-break construct, so this is the only path for multi-page deliverables. Aliases: `page-break`, `pb`. (#604)
 
 ### Fixed
 

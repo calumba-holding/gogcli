@@ -2,7 +2,7 @@
 
 Every `gog` command has a generated docs page. The source of truth is the live CLI schema; run `make docs-commands` after changing command names, flags, help text, aliases, or arguments.
 
-Generated pages: 564.
+Generated pages: 565.
 
 ## Top-level Commands
 
@@ -289,6 +289,7 @@ Generated pages: 564.
     - [gog docs format](gog-docs-format.md) - Apply text or paragraph formatting to a Google Doc
     - [gog docs info](gog-docs-info.md) - Get Google Doc metadata
     - [gog docs insert](gog-docs-insert.md) - Insert text at a specific position
+    - [gog docs insert-page-break](gog-docs-insert-page-break.md) - Insert a page break at a specific position (or end-of-doc with --at-end)
     - [gog docs list-tabs](gog-docs-list-tabs.md) - List all tabs in a Google Doc
     - [gog docs raw](gog-docs-raw.md) - Dump raw Google Docs API response as JSON (Documents.Get; lossless; for scripting and LLM consumption)
     - [gog docs rename-tab](gog-docs-rename-tab.md) - Rename a tab in a Google Doc

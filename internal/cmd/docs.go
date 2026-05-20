@@ -18,28 +18,29 @@ import (
 var newDocsService = googleapi.NewDocs
 
 type DocsCmd struct {
-	Export      DocsExportCmd      `cmd:"" name:"export" aliases:"download,dl" help:"Export a Google Doc (pdf|docx|txt|md|html)"`
-	Info        DocsInfoCmd        `cmd:"" name:"info" aliases:"get,show" help:"Get Google Doc metadata"`
-	Create      DocsCreateCmd      `cmd:"" name:"create" aliases:"add,new" help:"Create a Google Doc"`
-	Copy        DocsCopyCmd        `cmd:"" name:"copy" aliases:"cp,duplicate" help:"Copy a Google Doc"`
-	Cat         DocsCatCmd         `cmd:"" name:"cat" aliases:"text,read" help:"Print a Google Doc as plain text"`
-	Comments    DocsCommentsCmd    `cmd:"" name:"comments" help:"Manage comments on files"`
-	Tabs        DocsTabsCmd        `cmd:"" name:"tabs" help:"Manage Google Doc tabs"`
-	AddTab      DocsAddTabCmd      `cmd:"" name:"add-tab" help:"Add a tab to a Google Doc"`
-	RenameTab   DocsRenameTabCmd   `cmd:"" name:"rename-tab" help:"Rename a tab in a Google Doc"`
-	DeleteTab   DocsDeleteTabCmd   `cmd:"" name:"delete-tab" help:"Delete a tab from a Google Doc"`
-	ListTabs    DocsListTabsCmd    `cmd:"" name:"list-tabs" help:"List all tabs in a Google Doc"`
-	Write       DocsWriteCmd       `cmd:"" name:"write" help:"Write content to a Google Doc"`
-	Insert      DocsInsertCmd      `cmd:"" name:"insert" help:"Insert text at a specific position"`
-	Delete      DocsDeleteCmd      `cmd:"" name:"delete" help:"Delete text range from document"`
-	FindReplace DocsFindReplaceCmd `cmd:"" name:"find-replace" help:"Find and replace text. Supports plain text or markdown with images; use --first for a single occurrence."`
-	Update      DocsUpdateCmd      `cmd:"" name:"update" help:"Insert text at a specific index in a Google Doc"`
-	Edit        DocsEditCmd        `cmd:"" name:"edit" help:"Find and replace text in a Google Doc"`
-	Format      DocsFormatCmd      `cmd:"" name:"format" help:"Apply text or paragraph formatting to a Google Doc"`
-	Sed         DocsSedCmd         `cmd:"" name:"sed" help:"Regex find/replace (sed-style: s/pattern/replacement/g)"`
-	Clear       DocsClearCmd       `cmd:"" name:"clear" help:"Clear all content from a Google Doc"`
-	Structure   DocsStructureCmd   `cmd:"" name:"structure" aliases:"struct" help:"Show document structure with numbered paragraphs"`
-	Raw         DocsRawCmd         `cmd:"" name:"raw" help:"Dump raw Google Docs API response as JSON (Documents.Get; lossless; for scripting and LLM consumption)"`
+	Export          DocsExportCmd          `cmd:"" name:"export" aliases:"download,dl" help:"Export a Google Doc (pdf|docx|txt|md|html)"`
+	Info            DocsInfoCmd            `cmd:"" name:"info" aliases:"get,show" help:"Get Google Doc metadata"`
+	Create          DocsCreateCmd          `cmd:"" name:"create" aliases:"add,new" help:"Create a Google Doc"`
+	Copy            DocsCopyCmd            `cmd:"" name:"copy" aliases:"cp,duplicate" help:"Copy a Google Doc"`
+	Cat             DocsCatCmd             `cmd:"" name:"cat" aliases:"text,read" help:"Print a Google Doc as plain text"`
+	Comments        DocsCommentsCmd        `cmd:"" name:"comments" help:"Manage comments on files"`
+	Tabs            DocsTabsCmd            `cmd:"" name:"tabs" help:"Manage Google Doc tabs"`
+	AddTab          DocsAddTabCmd          `cmd:"" name:"add-tab" help:"Add a tab to a Google Doc"`
+	RenameTab       DocsRenameTabCmd       `cmd:"" name:"rename-tab" help:"Rename a tab in a Google Doc"`
+	DeleteTab       DocsDeleteTabCmd       `cmd:"" name:"delete-tab" help:"Delete a tab from a Google Doc"`
+	ListTabs        DocsListTabsCmd        `cmd:"" name:"list-tabs" help:"List all tabs in a Google Doc"`
+	Write           DocsWriteCmd           `cmd:"" name:"write" help:"Write content to a Google Doc"`
+	Insert          DocsInsertCmd          `cmd:"" name:"insert" help:"Insert text at a specific position"`
+	InsertPageBreak DocsInsertPageBreakCmd `cmd:"" name:"insert-page-break" aliases:"page-break,pb" help:"Insert a page break at a specific position (or end-of-doc with --at-end)"`
+	Delete          DocsDeleteCmd          `cmd:"" name:"delete" help:"Delete text range from document"`
+	FindReplace     DocsFindReplaceCmd     `cmd:"" name:"find-replace" help:"Find and replace text. Supports plain text or markdown with images; use --first for a single occurrence."`
+	Update          DocsUpdateCmd          `cmd:"" name:"update" help:"Insert text at a specific index in a Google Doc"`
+	Edit            DocsEditCmd            `cmd:"" name:"edit" help:"Find and replace text in a Google Doc"`
+	Format          DocsFormatCmd          `cmd:"" name:"format" help:"Apply text or paragraph formatting to a Google Doc"`
+	Sed             DocsSedCmd             `cmd:"" name:"sed" help:"Regex find/replace (sed-style: s/pattern/replacement/g)"`
+	Clear           DocsClearCmd           `cmd:"" name:"clear" help:"Clear all content from a Google Doc"`
+	Structure       DocsStructureCmd       `cmd:"" name:"structure" aliases:"struct" help:"Show document structure with numbered paragraphs"`
+	Raw             DocsRawCmd             `cmd:"" name:"raw" help:"Dump raw Google Docs API response as JSON (Documents.Get; lossless; for scripting and LLM consumption)"`
 }
 
 type DocsTabsCmd struct {
