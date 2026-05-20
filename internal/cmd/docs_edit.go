@@ -400,7 +400,7 @@ func (c *DocsUpdateCmd) Run(ctx context.Context, kctx *kong.Context, flags *Root
 	}
 	c.Tab = tab
 
-	var index any = "end"
+	var index any = docsAtIndexEnd
 	if c.Index > 0 {
 		index = c.Index
 	}
@@ -522,7 +522,7 @@ func (c *DocsInsertCmd) Run(ctx context.Context, flags *RootFlags) error {
 	if c.Index != nil {
 		dryRunPayload["atIndex"] = *c.Index
 	} else {
-		dryRunPayload["atIndex"] = "end"
+		dryRunPayload["atIndex"] = docsAtIndexEnd
 	}
 	if dryRunErr := dryRunExit(ctx, flags, "docs.insert", dryRunPayload); dryRunErr != nil {
 		return dryRunErr

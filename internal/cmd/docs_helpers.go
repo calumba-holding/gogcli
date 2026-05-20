@@ -16,6 +16,8 @@ import (
 	"github.com/steipete/gogcli/internal/config"
 )
 
+const docsAtIndexEnd = "end"
+
 func resolveContentInput(content, filePath string) (string, error) {
 	if content != "" {
 		return content, nil

@@ -10,6 +10,7 @@
 - Docs: add `gog docs insert-page-break <docId> [--index N | --at-end] [--tab=STRING]` to insert a Google Docs page break directly via `InsertPageBreakRequest` — markdown has no native page-break construct, so this is the only path for multi-page deliverables. Aliases: `page-break`, `pb`. (#604)
 - Docs: add `--heading-level N` (1..6 shortcut) and `--named-style NAME` (full enum) to `gog docs format` so existing paragraphs can be promoted to `HEADING_1`..`HEADING_6`, `TITLE`, `SUBTITLE`, or `NORMAL_TEXT`. Both set `paragraphStyle.namedStyleType` on the existing UpdateParagraphStyle request and compose cleanly with `--alignment` / `--line-spacing`. (#605)
 - Sheets: add `gog sheets reorder-tab <spreadsheetId> --tab=<name|sheetId> --to=N` to move a tab to a specific 0-based position via `updateSheetProperties` with field mask `index`. `--tab` accepts a title or a numeric sheet ID; `--to=0` is force-sent so the leftmost target reaches the wire as `"index":0`. Aliases: `move-tab`, `reorder-sheet`, `move-sheet`. (#603)
+- Docs: add `gog docs insert-table <docId> --rows N --cols M [--index N | --at-end] [--values-json [[...]]] [--tab=STRING]` to insert a native Google Docs table directly via `InsertTableRequest`, bypassing the markdown writer. `--values-json` takes a JSON 2D string array whose dimensions must match `--rows`x`--cols`. Empty `--values-json` produces an empty table structure. (#602)
 
 ### Fixed
 

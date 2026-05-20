@@ -12,7 +12,7 @@ import (
 // pass used by paragraphs/headings.
 
 func TestBuildTableCellRequests_AppliesInlineBold(t *testing.T) {
-	reqs, inserted := buildTableCellRequests("**Alice**", 100, false)
+	reqs, inserted := buildTableCellRequests("**Alice**", 100, false, "")
 
 	if inserted != utf16Len("Alice") {
 		t.Fatalf("expected inserted len = utf16Len(\"Alice\") = %d, got %d", utf16Len("Alice"), inserted)
@@ -53,7 +53,7 @@ func TestBuildTableCellRequests_AppliesInlineItalicAndCode(t *testing.T) {
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			reqs, inserted := buildTableCellRequests(tt.cell, 50, false)
+			reqs, inserted := buildTableCellRequests(tt.cell, 50, false, "")
 			if inserted != utf16Len(tt.wantText) {
 				t.Fatalf("inserted = %d, want %d", inserted, utf16Len(tt.wantText))
 			}
@@ -78,7 +78,7 @@ func TestBuildTableCellRequests_AppliesInlineItalicAndCode(t *testing.T) {
 }
 
 func TestBuildTableCellRequests_HeaderRowAppliesBoldOverWholeCell(t *testing.T) {
-	reqs, inserted := buildTableCellRequests("Field", 10, true)
+	reqs, inserted := buildTableCellRequests("Field", 10, true, "")
 
 	if inserted != utf16Len("Field") {
 		t.Fatalf("inserted = %d, want %d", inserted, utf16Len("Field"))
@@ -95,8 +95,29 @@ func TestBuildTableCellRequests_HeaderRowAppliesBoldOverWholeCell(t *testing.T) 
 	}
 }
 
+func TestBuildTableCellRequests_IncludesTabID(t *testing.T) {
+	reqs, inserted := buildTableCellRequests("**Field**", 10, true, "t.second")
+	if inserted != utf16Len("Field") {
+		t.Fatalf("inserted = %d, want %d", inserted, utf16Len("Field"))
+	}
+	if len(reqs) != 3 {
+		t.Fatalf("expected 3 requests (insert + header bold + inline bold), got %d: %#v", len(reqs), reqs)
+	}
+	if got := reqs[0].InsertText.Location; got == nil || got.TabId != "t.second" {
+		t.Fatalf("expected insert tab ID, got %#v", got)
+	}
+	for i, req := range reqs[1:] {
+		if req.UpdateTextStyle == nil || req.UpdateTextStyle.Range == nil {
+			t.Fatalf("request %d: expected UpdateTextStyle range, got %#v", i+1, req)
+		}
+		if req.UpdateTextStyle.Range.TabId != "t.second" {
+			t.Fatalf("request %d: expected tab ID t.second, got %#v", i+1, req.UpdateTextStyle.Range)
+		}
+	}
+}
+
 func TestBuildTableCellRequests_PlainTextNoStyleRequest(t *testing.T) {
-	reqs, inserted := buildTableCellRequests("plain text", 1, false)
+	reqs, inserted := buildTableCellRequests("plain text", 1, false, "")
 	if inserted != utf16Len("plain text") {
 		t.Fatalf("inserted = %d, want %d", inserted, utf16Len("plain text"))
 	}
@@ -110,7 +131,7 @@ func TestBuildTableCellRequests_PlainTextNoStyleRequest(t *testing.T) {
 
 func TestBuildTableCellRequests_EmptyAfterStrippingReturnsNothing(t *testing.T) {
 	// A cell whose entire content is markers (e.g. "**") would strip to "".
-	reqs, inserted := buildTableCellRequests("", 1, false)
+	reqs, inserted := buildTableCellRequests("", 1, false, "")
 	if len(reqs) != 0 || inserted != 0 {
 		t.Fatalf("expected (nil, 0) for empty cell, got reqs=%#v inserted=%d", reqs, inserted)
 	}

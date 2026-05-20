@@ -261,6 +261,7 @@ Docs: [Google Docs editing](docs/docs-editing.md),
 gog docs write <docId> --append --markdown --text '## Status'
 gog docs format <docId> --match Status --bold --font-size 18
 gog docs insert-page-break <docId> --at-end
+gog docs insert-table <docId> --rows 3 --cols 2 --at-end
 gog docs add-tab <docId> --title "Notes"
 gog docs tabs add <docId> --title "Notes"
 gog docs find-replace <docId> old new --tab "Notes" --dry-run

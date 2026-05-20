@@ -51,7 +51,7 @@ func (c *DocsInsertPageBreakCmd) Run(ctx context.Context, flags *RootFlags) erro
 		"tab":        c.Tab,
 	}
 	if resolveEnd {
-		dryRunPayload["atIndex"] = "end"
+		dryRunPayload["atIndex"] = docsAtIndexEnd
 	} else {
 		dryRunPayload["atIndex"] = *c.Index
 	}

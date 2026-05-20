@@ -50,13 +50,28 @@ func (ti *TableInserter) InsertNativeTable(ctx context.Context, tableIndex int64
 	}
 
 	// Step 2: Fetch the document to get cell indices
-	doc, err := ti.svc.Documents.Get(ti.docID).Context(ctx).Do()
+	getCall := ti.svc.Documents.Get(ti.docID).Context(ctx)
+	if tabID != "" {
+		getCall = getCall.IncludeTabsContent(true)
+	}
+	doc, err := getCall.Do()
 	if err != nil {
 		return tableIndex, fmt.Errorf("get document after table insert: %w", err)
 	}
+	targetDoc := doc
+	if tabID != "" {
+		tab, tabErr := findTab(flattenTabs(doc.Tabs), tabID)
+		if tabErr != nil {
+			return tableIndex, tabErr
+		}
+		if tab.DocumentTab == nil || tab.DocumentTab.Body == nil {
+			return tableIndex, fmt.Errorf("tab has no document body: %s", tabID)
+		}
+		targetDoc = &docs.Document{Body: tab.DocumentTab.Body}
+	}
 
 	// Step 3: Find the table in the document and get cell indices
-	cellIndices, tableEndIndex, err := ti.getTableCellIndices(doc, tableIndex, rows, cols)
+	cellIndices, tableEndIndex, err := ti.getTableCellIndices(targetDoc, tableIndex, rows, cols)
 	if err != nil {
 		return tableEndIndex, err
 	}
@@ -74,7 +89,7 @@ func (ti *TableInserter) InsertNativeTable(ctx context.Context, tableIndex int64
 				continue
 			}
 
-			requests, insertedLen := buildTableCellRequests(cellContent, cellIdx, rowIdx == 0)
+			requests, insertedLen := buildTableCellRequests(cellContent, cellIdx, rowIdx == 0, tabID)
 			if len(requests) == 0 {
 				continue
 			}
@@ -101,7 +116,7 @@ func (ti *TableInserter) InsertNativeTable(ctx context.Context, tableIndex int64
 // the UTF-16 length of the text that will be inserted so callers can keep
 // running cell indices in sync. If the cell content strips to an empty string
 // (e.g. content was only markers), returns (nil, 0).
-func buildTableCellRequests(cellContent string, cellIdx int64, isHeaderRow bool) ([]*docs.Request, int64) {
+func buildTableCellRequests(cellContent string, cellIdx int64, isHeaderRow bool, tabID string) ([]*docs.Request, int64) {
 	styles, stripped := ParseInlineFormatting(cellContent)
 	if stripped == "" {
 		return nil, 0
@@ -110,7 +125,7 @@ func buildTableCellRequests(cellContent string, cellIdx int64, isHeaderRow bool)
 	insertedLen := utf16Len(stripped)
 	requests := []*docs.Request{{
 		InsertText: &docs.InsertTextRequest{
-			Location: &docs.Location{Index: cellIdx},
+			Location: &docs.Location{Index: cellIdx, TabId: tabID},
 			Text:     stripped,
 		},
 	}}
@@ -121,6 +136,7 @@ func buildTableCellRequests(cellContent string, cellIdx int64, isHeaderRow bool)
 				Range: &docs.Range{
 					StartIndex: cellIdx,
 					EndIndex:   cellIdx + insertedLen,
+					TabId:      tabID,
 				},
 				TextStyle: &docs.TextStyle{Bold: true},
 				Fields:    "bold",
@@ -129,7 +145,7 @@ func buildTableCellRequests(cellContent string, cellIdx int64, isHeaderRow bool)
 	}
 
 	for _, style := range styles {
-		if req := buildTextStyleRequest(style, cellIdx, ""); req != nil {
+		if req := buildTextStyleRequest(style, cellIdx, tabID); req != nil {
 			requests = append(requests, req)
 		}
 	}

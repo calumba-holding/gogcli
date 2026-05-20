@@ -72,6 +72,28 @@ Command page:
 
 - [`gog docs insert-page-break`](commands/gog-docs-insert-page-break.md)
 
+## Tables
+
+Insert a native Google Docs table directly via the Docs API, bypassing the
+Markdown writer:
+
+```bash
+gog docs insert-table <docId> --rows 3 --cols 2 --at-end
+gog docs insert-table <docId> --rows 2 --cols 2 --index 1 \
+  --values-json '[["A","B"],["C","D"]]'
+```
+
+`--values-json` takes a JSON 2D string array whose dimensions must match
+`--rows`x`--cols`; omit it to insert an empty table structure. Use `--at-end`
+to append at the end of the document (or the selected `--tab`), or `--index N`
+to insert at a specific document index. Prefer this primitive when you want a
+guaranteed native table rather than relying on the Markdown writer's table
+rendering (see `gog docs write --markdown`).
+
+Command page:
+
+- [`gog docs insert-table`](commands/gog-docs-insert-table.md)
+
 ## Tabs
 
 Manage Google Docs tabs:
