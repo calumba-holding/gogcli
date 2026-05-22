@@ -29,6 +29,7 @@ type Store interface {
 
 type KeyringStore struct {
 	ring keyring.Keyring
+	lock *keyringLock
 }
 
 type Token struct {
@@ -317,7 +318,12 @@ func OpenDefault() (Store, error) {
 		return nil, err
 	}
 
-	return &KeyringStore{ring: ring}, nil
+	lock, _, err := keyringLockForRing(ring)
+	if err != nil {
+		return nil, err
+	}
+
+	return &KeyringStore{ring: ring, lock: lock}, nil
 }
 
 func SetSecret(key string, value []byte) error {
@@ -331,7 +337,9 @@ func SetSecret(key string, value []byte) error {
 		return err
 	}
 
-	if err := verifiedSet(ring, key, value, "secret"); err != nil {
+	if err := withOptionalKeyringLock(ring, true, func() error {
+		return verifiedSet(ring, key, value, "secret")
+	}); err != nil {
 		return wrapKeychainError(fmt.Errorf("store secret: %w", err))
 	}
 
@@ -349,8 +357,18 @@ func GetSecret(key string) ([]byte, error) {
 		return nil, err
 	}
 
-	item, err := ring.Get(key)
-	if err != nil {
+	var item keyring.Item
+
+	if err := withOptionalKeyringLock(ring, false, func() error {
+		var getErr error
+
+		item, getErr = ring.Get(key)
+		if getErr != nil {
+			return fmt.Errorf("get secret: %w", getErr)
+		}
+
+		return nil
+	}); err != nil {
 		return nil, fmt.Errorf("read secret: %w", err)
 	}
 
@@ -358,12 +376,44 @@ func GetSecret(key string) ([]byte, error) {
 }
 
 func (s *KeyringStore) Keys() ([]string, error) {
+	var keys []string
+
+	err := s.withReadLock(func() error {
+		var keysErr error
+		keys, keysErr = s.keysNoLock()
+
+		return keysErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return keys, nil
+}
+
+func (s *KeyringStore) keysNoLock() ([]string, error) {
 	keys, err := s.ring.Keys()
 	if err != nil {
 		return nil, fmt.Errorf("list keyring keys: %w", err)
 	}
 
+	if s.lock != nil {
+		keys = withoutInternalKeyringKeys(keys)
+	}
+
 	return keys, nil
+}
+
+func withoutInternalKeyringKeys(keys []string) []string {
+	out := keys[:0]
+	for _, key := range keys {
+		if key == keyringLockFilename {
+			continue
+		}
+		out = append(out, key)
+	}
+
+	return out
 }
 
 type storedToken struct {
@@ -376,6 +426,12 @@ type storedToken struct {
 }
 
 func (s *KeyringStore) SetToken(client string, email string, tok Token) error {
+	return s.withWriteLock(func() error {
+		return s.setTokenNoLock(client, email, tok)
+	})
+}
+
+func (s *KeyringStore) setTokenNoLock(client string, email string, tok Token) error {
 	email = normalize(email)
 	if email == "" {
 		return errMissingEmail
@@ -397,7 +453,7 @@ func (s *KeyringStore) SetToken(client string, email string, tok Token) error {
 	tok.Email = email
 
 	oldSubject := ""
-	if existing, getErr := s.GetToken(normalizedClient, email); getErr == nil {
+	if existing, getErr := s.getTokenNoLock(normalizedClient, email); getErr == nil {
 		oldSubject = strings.TrimSpace(existing.Subject)
 	}
 
@@ -440,6 +496,22 @@ func (s *KeyringStore) SetToken(client string, email string, tok Token) error {
 }
 
 func (s *KeyringStore) GetToken(client string, email string) (Token, error) {
+	var tok Token
+
+	err := s.withWriteLock(func() error {
+		var getErr error
+		tok, getErr = s.getTokenNoLock(client, email)
+
+		return getErr
+	})
+	if err != nil {
+		return Token{}, err
+	}
+
+	return tok, nil
+}
+
+func (s *KeyringStore) getTokenNoLock(client string, email string) (Token, error) {
 	email = normalize(email)
 	if email == "" {
 		return Token{}, errMissingEmail
@@ -483,6 +555,12 @@ func (s *KeyringStore) GetToken(client string, email string) (Token, error) {
 }
 
 func (s *KeyringStore) DeleteToken(client string, email string) error {
+	return s.withWriteLock(func() error {
+		return s.deleteTokenNoLock(client, email)
+	})
+}
+
+func (s *KeyringStore) deleteTokenNoLock(client string, email string) error {
 	email = normalize(email)
 	if email == "" {
 		return errMissingEmail
@@ -494,7 +572,7 @@ func (s *KeyringStore) DeleteToken(client string, email string) error {
 	}
 
 	var subject string
-	if tok, getErr := s.GetToken(normalizedClient, email); getErr == nil {
+	if tok, getErr := s.getTokenNoLock(normalizedClient, email); getErr == nil {
 		subject = strings.TrimSpace(tok.Subject)
 	}
 
@@ -520,6 +598,12 @@ func (s *KeyringStore) DeleteToken(client string, email string) error {
 // DeleteTokenAlias removes only the email-address key for a token, preserving
 // the subject-keyed canonical copy.
 func (s *KeyringStore) DeleteTokenAlias(client string, email string) error {
+	return s.withWriteLock(func() error {
+		return s.deleteTokenAliasNoLock(client, email)
+	})
+}
+
+func (s *KeyringStore) deleteTokenAliasNoLock(client string, email string) error {
 	email = normalize(email)
 	if email == "" {
 		return errMissingEmail
@@ -544,7 +628,24 @@ func (s *KeyringStore) DeleteTokenAlias(client string, email string) error {
 }
 
 func (s *KeyringStore) ListTokens() ([]Token, error) {
-	keys, err := s.Keys()
+	var tokens []Token
+
+	err := s.withWriteLock(func() error {
+		var listErr error
+
+		tokens, listErr = s.listTokensNoLock()
+
+		return listErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
+}
+
+func (s *KeyringStore) listTokensNoLock() ([]Token, error) {
+	keys, err := s.keysNoLock()
 	if err != nil {
 		return nil, fmt.Errorf("list tokens: %w", err)
 	}
@@ -576,12 +677,12 @@ func (s *KeyringStore) ListTokens() ([]Token, error) {
 		var tok Token
 
 		if subject != "" {
-			t, err := s.getTokenBySubject(client, subject)
+			t, err := s.getTokenBySubjectNoLock(client, subject)
 			if err != nil {
 				return nil, fmt.Errorf("read token for subject %s: %w", subject, err)
 			}
 			tok = t
-		} else if t, err := s.GetToken(client, email); err != nil {
+		} else if t, err := s.getTokenNoLock(client, email); err != nil {
 			return nil, fmt.Errorf("read token for %s: %w", email, err)
 		} else {
 			tok = t
@@ -664,7 +765,7 @@ func parseSubjectTokenKey(k string) (client string, subject string, ok bool) {
 	return parts[0], parts[1], true
 }
 
-func (s *KeyringStore) getTokenBySubject(client string, subject string) (Token, error) {
+func (s *KeyringStore) getTokenBySubjectNoLock(client string, subject string) (Token, error) {
 	normalizedClient, err := normalizeClient(client)
 	if err != nil {
 		return Token{}, err
@@ -724,6 +825,22 @@ func defaultAccountKeyForClient(client string) string {
 }
 
 func (s *KeyringStore) GetDefaultAccount(client string) (string, error) {
+	var account string
+
+	err := s.withReadLock(func() error {
+		var getErr error
+		account, getErr = s.getDefaultAccountNoLock(client)
+
+		return getErr
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return account, nil
+}
+
+func (s *KeyringStore) getDefaultAccountNoLock(client string) (string, error) {
 	normalizedClient, err := normalizeClient(client)
 	if err != nil {
 		return "", err
@@ -760,6 +877,12 @@ func (s *KeyringStore) GetDefaultAccount(client string) (string, error) {
 }
 
 func (s *KeyringStore) SetDefaultAccount(client string, email string) error {
+	return s.withWriteLock(func() error {
+		return s.setDefaultAccountNoLock(client, email)
+	})
+}
+
+func (s *KeyringStore) setDefaultAccountNoLock(client string, email string) error {
 	email = normalize(email)
 	if email == "" {
 		return errMissingEmail
@@ -790,6 +913,12 @@ func (s *KeyringStore) SetDefaultAccount(client string, email string) error {
 }
 
 func (s *KeyringStore) DeleteDefaultAccount(client string) error {
+	return s.withWriteLock(func() error {
+		return s.deleteDefaultAccountNoLock(client)
+	})
+}
+
+func (s *KeyringStore) deleteDefaultAccountNoLock(client string) error {
 	normalizedClient, err := normalizeClient(client)
 	if err != nil {
 		return err
@@ -812,6 +941,22 @@ func (s *KeyringStore) DeleteDefaultAccount(client string) error {
 	}
 
 	return nil
+}
+
+func (s *KeyringStore) withReadLock(fn func() error) error {
+	if s.lock == nil {
+		return fn()
+	}
+
+	return s.lock.withReadLock(fn)
+}
+
+func (s *KeyringStore) withWriteLock(fn func() error) error {
+	if s.lock == nil {
+		return fn()
+	}
+
+	return s.lock.withWriteLock(fn)
 }
 
 func verifiedSet(ring keyring.Keyring, key string, data []byte, label string) error {

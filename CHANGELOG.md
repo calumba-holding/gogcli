@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Auth: serialize file-keyring reads and writes with a shared lock so concurrent `gog` processes cannot observe partial keyring entries or clobber multi-key token updates. (#597)
 - Release: verify the OpenClaw Homebrew tap checkout when checking `gogcli` formula assets.
 
 ## 0.18.0 - 2026-05-22
