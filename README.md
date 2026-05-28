@@ -1,3 +1,5 @@
+![gogcli banner](docs/assets/readme-banner.jpg)
+
 # gogcli
 
 `gog` is a script-friendly Google CLI for Gmail, Calendar, Drive, Docs, Sheets,
