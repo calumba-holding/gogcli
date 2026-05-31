@@ -183,15 +183,6 @@ func (c *ContactsExportCmd) loadSelectedContact(ctx context.Context, svc *people
 	return nil, fmt.Errorf("ambiguous contact selector %q matched %d contacts; use people/... or --query", selector, len(contacts))
 }
 
-func warmSearchContactsCache(ctx context.Context, svc *people.Service) {
-	_, _ = svc.People.SearchContacts().
-		Query("").
-		PageSize(1).
-		ReadMask("names").
-		Context(ctx).
-		Do()
-}
-
 func personHasEmail(p *people.Person, email string) bool {
 	for _, e := range p.EmailAddresses {
 		if e != nil && strings.EqualFold(strings.TrimSpace(e.Value), strings.TrimSpace(email)) {

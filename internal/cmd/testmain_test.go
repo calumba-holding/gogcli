@@ -9,6 +9,8 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	contactsSearchWarmupDelay = 0
+
 	root, err := os.MkdirTemp("", "gogcli-tests-*")
 	if err != nil {
 		panic(err)

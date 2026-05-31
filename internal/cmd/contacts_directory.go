@@ -331,6 +331,7 @@ func (c *ContactsOtherSearchCmd) Run(ctx context.Context, flags *RootFlags) erro
 		return err
 	}
 
+	warmSearchOtherContactsCache(ctx, svc)
 	resp, err := svc.OtherContacts.Search().
 		Query(query).
 		ReadMask(contactsOtherReadMask).

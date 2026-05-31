@@ -124,6 +124,7 @@ func (c *ContactsGetCmd) Run(ctx context.Context, flags *RootFlags) error {
 			return err
 		}
 	} else {
+		warmSearchContactsCache(ctx, svc)
 		resp, err := svc.People.SearchContacts().
 			Query(identifier).
 			PageSize(10).

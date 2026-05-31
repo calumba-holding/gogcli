@@ -85,12 +85,18 @@ func TestExecute_ContactsGet_ByEmail_JSON(t *testing.T) {
 	origNew := newPeopleContactsService
 	t.Cleanup(func() { newPeopleContactsService = origNew })
 
+	var queries []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.URL.Path, "people:searchContacts") {
 			http.NotFound(w, r)
 			return
 		}
+		queries = append(queries, r.URL.Query().Get("query"))
 		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Query().Get("query") == "" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"results": []map[string]any{}})
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"results": []map[string]any{
 				{
@@ -135,5 +141,142 @@ func TestExecute_ContactsGet_ByEmail_JSON(t *testing.T) {
 	}
 	if parsed.Contact.ResourceName != "people/c1" {
 		t.Fatalf("unexpected contact: %#v", parsed.Contact)
+	}
+	if got, want := strings.Join(queries, ","), ",ada@example.com"; got != want {
+		t.Fatalf("search queries = %q, want %q", got, want)
+	}
+}
+
+func TestExecute_ContactsSearch_WarmsCache(t *testing.T) {
+	origNew := newPeopleContactsService
+	t.Cleanup(func() { newPeopleContactsService = origNew })
+
+	var queries []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "people:searchContacts") {
+			http.NotFound(w, r)
+			return
+		}
+		query := r.URL.Query().Get("query")
+		queries = append(queries, query)
+		w.Header().Set("Content-Type", "application/json")
+		if query == "" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"results": []map[string]any{}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"results": []map[string]any{
+				{
+					"person": map[string]any{
+						"resourceName": "people/c1",
+						"names":        []map[string]any{{"displayName": "Ada Lovelace"}},
+						"emailAddresses": []map[string]any{
+							{"value": "ada@example.com"},
+						},
+					},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	svc, err := people.NewService(context.Background(),
+		option.WithoutAuthentication(),
+		option.WithHTTPClient(srv.Client()),
+		option.WithEndpoint(srv.URL+"/"),
+	)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	newPeopleContactsService = func(context.Context, string) (*people.Service, error) { return svc, nil }
+
+	out := captureStdout(t, func() {
+		_ = captureStderr(t, func() {
+			if err := Execute([]string{"--json", "--account", "a@b.com", "contacts", "search", "Ada"}); err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+		})
+	})
+
+	var parsed struct {
+		Contacts []struct {
+			Resource string `json:"resource"`
+		} `json:"contacts"`
+	}
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("json parse: %v\nout=%q", err, out)
+	}
+	if len(parsed.Contacts) != 1 || parsed.Contacts[0].Resource != "people/c1" {
+		t.Fatalf("unexpected contacts: %#v", parsed.Contacts)
+	}
+	if got, want := strings.Join(queries, ","), ",Ada"; got != want {
+		t.Fatalf("search queries = %q, want %q", got, want)
+	}
+}
+
+func TestExecute_ContactsOtherSearch_WarmsCache(t *testing.T) {
+	origNew := newPeopleOtherContactsService
+	t.Cleanup(func() { newPeopleOtherContactsService = origNew })
+
+	var queries []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "otherContacts:search") {
+			http.NotFound(w, r)
+			return
+		}
+		query := r.URL.Query().Get("query")
+		queries = append(queries, query)
+		w.Header().Set("Content-Type", "application/json")
+		if query == "" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"results": []map[string]any{}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"results": []map[string]any{
+				{
+					"person": map[string]any{
+						"resourceName": "otherContacts/c1",
+						"names":        []map[string]any{{"displayName": "Other Ada"}},
+						"emailAddresses": []map[string]any{
+							{"value": "other@example.com"},
+						},
+					},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	svc, err := people.NewService(context.Background(),
+		option.WithoutAuthentication(),
+		option.WithHTTPClient(srv.Client()),
+		option.WithEndpoint(srv.URL+"/"),
+	)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	newPeopleOtherContactsService = func(context.Context, string) (*people.Service, error) { return svc, nil }
+
+	out := captureStdout(t, func() {
+		_ = captureStderr(t, func() {
+			if err := Execute([]string{"--json", "--account", "a@b.com", "contacts", "other", "search", "Other"}); err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+		})
+	})
+
+	var parsed struct {
+		Contacts []struct {
+			Resource string `json:"resource"`
+		} `json:"contacts"`
+	}
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("json parse: %v\nout=%q", err, out)
+	}
+	if len(parsed.Contacts) != 1 || parsed.Contacts[0].Resource != "otherContacts/c1" {
+		t.Fatalf("unexpected contacts: %#v", parsed.Contacts)
+	}
+	if got, want := strings.Join(queries, ","), ",Other"; got != want {
+		t.Fatalf("search queries = %q, want %q", got, want)
 	}
 }

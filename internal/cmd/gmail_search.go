@@ -124,6 +124,7 @@ func gmailFromContactQuery(ctx context.Context, account, selector string) (strin
 	if err != nil {
 		return "", err
 	}
+	warmSearchContactsCache(ctx, svc)
 	resp, err := svc.People.SearchContacts().
 		Query(selector).
 		PageSize(10).

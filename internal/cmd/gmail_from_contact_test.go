@@ -1,8 +1,14 @@
 package cmd
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"google.golang.org/api/option"
 	"google.golang.org/api/people/v1"
 )
 
@@ -34,5 +40,60 @@ func TestAllContactEmailsDedupes(t *testing.T) {
 	}})
 	if len(got) != 2 || got[0] != "A@example.com" || got[1] != "b@example.com" {
 		t.Fatalf("emails = %#v", got)
+	}
+}
+
+func TestGmailFromContactQuery_WarmsContactsSearchCache(t *testing.T) {
+	origNew := newPeopleContactsService
+	t.Cleanup(func() { newPeopleContactsService = origNew })
+
+	var queries []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "people:searchContacts") {
+			http.NotFound(w, r)
+			return
+		}
+		query := r.URL.Query().Get("query")
+		queries = append(queries, query)
+		w.Header().Set("Content-Type", "application/json")
+		if query == "" {
+			_ = json.NewEncoder(w).Encode(map[string]any{"results": []map[string]any{}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"results": []map[string]any{
+				{
+					"person": map[string]any{
+						"resourceName": "people/c1",
+						"names":        []map[string]any{{"displayName": "Alice"}},
+						"emailAddresses": []map[string]any{
+							{"value": "alice@example.com"},
+						},
+					},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	svc, err := people.NewService(context.Background(),
+		option.WithoutAuthentication(),
+		option.WithHTTPClient(srv.Client()),
+		option.WithEndpoint(srv.URL+"/"),
+	)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	newPeopleContactsService = func(context.Context, string) (*people.Service, error) { return svc, nil }
+
+	got, err := gmailFromContactQuery(context.Background(), "a@b.com", "Alice")
+	if err != nil {
+		t.Fatalf("gmailFromContactQuery: %v", err)
+	}
+	if got != "from:alice@example.com" {
+		t.Fatalf("query = %q", got)
+	}
+	if got, want := strings.Join(queries, ","), ",Alice"; got != want {
+		t.Fatalf("search queries = %q, want %q", got, want)
 	}
 }
