@@ -230,7 +230,10 @@ func (c *ChatSpacesCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
 	memberUsers := make([]string, 0, len(members))
 	memberships := make([]*chat.Membership, 0, len(members))
 	for _, member := range members {
-		user := normalizeUser(member)
+		user, err := normalizeChatMemberUser(member)
+		if err != nil {
+			return err
+		}
 		if user == "" {
 			continue
 		}

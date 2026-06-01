@@ -296,6 +296,34 @@ func TestExecute_ChatSpacesCreate_JSON(t *testing.T) {
 	}
 }
 
+func TestExecute_ChatSpacesCreate_InvalidMemberFailsBeforeDryRun(t *testing.T) {
+	origNew := newChatService
+	t.Cleanup(func() { newChatService = origNew })
+	newChatService = func(context.Context, string) (*chat.Service, error) {
+		t.Fatalf("expected validation to fail before creating chat service")
+		return nil, errUnexpectedChatServiceCall
+	}
+
+	testCases := [][]string{
+		{"--account", "a@b.com", "--dry-run", "chat", "spaces", "create", "Team", "--member", "nope"},
+		{"--account", "a@b.com", "--dry-run", "chat", "spaces", "create", "Team", "--member", "Tester <x@example.com>"},
+		{"--account", "a@b.com", "--dry-run", "chat", "spaces", "create", "Team", "--member", "users/"},
+		{"--account", "a@b.com", "--dry-run", "chat", "spaces", "create", "Team", "--member", "users/foo/bar"},
+		{"--account", "a@b.com", "--dry-run", "chat", "spaces", "create", "Team", "--member", "users/Tester <x@example.com>"},
+	}
+	for _, args := range testCases {
+		t.Run(strings.Join(args[4:], "_"), func(t *testing.T) {
+			_ = captureStderr(t, func() {
+				err := Execute(args)
+				var exitErr *ExitError
+				if !errors.As(err, &exitErr) || exitErr.Code != 2 || !strings.Contains(err.Error(), "invalid --member") {
+					t.Fatalf("unexpected err: %v", err)
+				}
+			})
+		})
+	}
+}
+
 func TestExecute_ChatMessagesList_Text_Unread(t *testing.T) {
 	var gotFilter string
 

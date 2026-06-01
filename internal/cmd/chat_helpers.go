@@ -33,6 +33,24 @@ func normalizeUser(resource string) string {
 	return "users/" + user
 }
 
+func normalizeChatMemberUser(member string) (string, error) {
+	user := strings.TrimSpace(member)
+	if user == "" {
+		return "", nil
+	}
+	if strings.HasPrefix(user, "users/") {
+		id := strings.TrimPrefix(user, "users/")
+		if id == "" || strings.Contains(id, "/") || strings.ContainsAny(id, " \t\r\n<>") {
+			return "", usagef("invalid --member %q", member)
+		}
+		return user, nil
+	}
+	if err := validatePlainEmail("--member", user); err != nil {
+		return "", err
+	}
+	return "users/" + user, nil
+}
+
 func requireWorkspaceAccount(account string) error {
 	if isConsumerAccount(account) {
 		return usage("chat requires a Google Workspace account (non-gmail.com)")
