@@ -93,7 +93,7 @@ func (c *CalendarProposeTimeCmd) Run(ctx context.Context, flags *RootFlags) erro
 	// If declining, update the event response
 	if decline {
 		if len(event.Attendees) == 0 {
-			return fmt.Errorf("event has no attendees, cannot decline")
+			return usage("event has no attendees, cannot decline")
 		}
 
 		var selfIdx *int
@@ -104,10 +104,10 @@ func (c *CalendarProposeTimeCmd) Run(ctx context.Context, flags *RootFlags) erro
 			}
 		}
 		if selfIdx == nil {
-			return fmt.Errorf("you are not an attendee of this event")
+			return usage("you are not an attendee of this event")
 		}
 		if event.Attendees[*selfIdx].Organizer {
-			return fmt.Errorf("cannot decline your own event (you are the organizer)")
+			return usage("cannot decline your own event (you are the organizer)")
 		}
 
 		event.Attendees[*selfIdx].ResponseStatus = "declined"
