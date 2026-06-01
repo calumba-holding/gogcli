@@ -36,6 +36,7 @@
 - Docs/Sheets/Slides: report service-specific dry-run ops for `copy` commands instead of `drive.copy`.
 - Docs: return usage exit code 2 when Markdown writes contain local image references that must be hosted at a public HTTPS URL.
 - Docs: return usage exit code 2 when `docs sed` table operations target missing or out-of-range tables, rows, or columns.
+- Docs: return usage exit code 2 when `docs cell-style` and `docs table-column-width` target missing or out-of-range tables or columns.
 - CLI: report public command paths in dry-run op fields for service-account, Calendar, Forms, Meet, and Sheets named-range commands.
 - CLI: preserve command-local `--fields` API masks for Drive, Drive Labels, Sites, and Calendar Events instead of rewriting them to JSON `--select`.
 - Drive: return usage exit code 2 when `drive download --tab` rejects unsupported export formats.

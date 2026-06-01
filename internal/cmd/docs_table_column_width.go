@@ -143,12 +143,12 @@ func (c *DocsTableColumnWidthCmd) validate() error {
 
 func (c *DocsTableColumnWidthCmd) buildRequest(tableStart int64, colCount int, tabID string) (*docs.Request, error) {
 	if colCount < 1 {
-		return nil, fmt.Errorf("target table has no columns")
+		return nil, usage("target table has no columns")
 	}
 	var columnIndices []int64
 	if c.Col > 0 {
 		if c.Col > colCount {
-			return nil, fmt.Errorf("col %d out of range (table has %d columns)", c.Col, colCount)
+			return nil, usagef("col %d out of range (table has %d columns)", c.Col, colCount)
 		}
 		columnIndices = []int64{int64(c.Col - 1)}
 	}
@@ -174,14 +174,14 @@ func (c *DocsTableColumnWidthCmd) buildRequest(tableStart int64, colCount int, t
 func resolveDocsTableWithIndex(doc *docs.Document, requested int) (tableWithIndex, int, error) {
 	tables := collectAllTablesWithIndex(doc)
 	if len(tables) == 0 {
-		return tableWithIndex{}, 0, fmt.Errorf("document has no tables")
+		return tableWithIndex{}, 0, usage("document has no tables")
 	}
 	idx := requested
 	if idx < 0 {
 		idx = len(tables) + idx + 1
 	}
 	if idx < 1 || idx > len(tables) {
-		return tableWithIndex{}, 0, fmt.Errorf("table %d out of range (document has %d tables)", requested, len(tables))
+		return tableWithIndex{}, 0, usagef("table %d out of range (document has %d tables)", requested, len(tables))
 	}
 	return tables[idx-1], idx, nil
 }

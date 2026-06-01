@@ -80,10 +80,10 @@ func (c *DocsCellStyleCmd) Run(ctx context.Context, flags *RootFlags) error {
 
 	tables := collectAllTablesWithIndex(loaded.target)
 	if len(tables) == 0 {
-		return fmt.Errorf("document has no tables")
+		return usage("document has no tables")
 	}
 	if c.TableIndex >= len(tables) {
-		return fmt.Errorf("table %d out of range (document has %d tables)", c.TableIndex, len(tables))
+		return usagef("table %d out of range (document has %d tables)", c.TableIndex, len(tables))
 	}
 	table := tables[c.TableIndex]
 	cell, err := findTableCell(loaded.target, &tableCellRef{

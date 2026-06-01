@@ -78,6 +78,32 @@ func TestDocsCellStyleBuildsTableAndTextRequests(t *testing.T) {
 	}
 }
 
+func TestDocsCellStyle_TableSelectionErrorsAreUsage(t *testing.T) {
+	origDocs := newDocsService
+	t.Cleanup(func() { newDocsService = origDocs })
+
+	docSvc, cleanup := newDocsServiceForTest(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/documents/"):
+			_ = json.NewEncoder(w).Encode(docBodyWithText("No tables\n"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer cleanup()
+	newDocsService = func(context.Context, string) (*docs.Service, error) { return docSvc, nil }
+
+	cmd := &DocsCellStyleCmd{}
+	err := runKong(t, cmd, []string{"doc1", "--row", "0", "--col", "0", "--background-color", "#fff"}, newDocsCmdContext(t), &RootFlags{Account: "a@b.com"})
+	if err == nil || !strings.Contains(err.Error(), "document has no tables") {
+		t.Fatalf("expected no-tables error, got %v", err)
+	}
+	if got := ExitCode(err); got != 2 {
+		t.Fatalf("ExitCode = %d, want 2 (err=%v)", got, err)
+	}
+}
+
 func TestDocsTableColumnWidthBuildsFixedRequest(t *testing.T) {
 	cmd := &DocsTableColumnWidthCmd{Col: 2, Width: 120}
 	req, err := cmd.buildRequest(5, 3, "tab-1")
@@ -155,6 +181,23 @@ func TestDocsTableColumnWidthValidation(t *testing.T) {
 				t.Fatalf("expected %q error, got %v", tt.want, err)
 			}
 		})
+	}
+}
+
+func TestDocsTableColumnWidth_TargetErrorsAreUsage(t *testing.T) {
+	doc := &docs.Document{Body: &docs.Body{Content: []*docs.StructuralElement{}}}
+	if _, _, err := resolveDocsTableWithIndex(doc, 1); err == nil || ExitCode(err) != 2 {
+		t.Fatalf("resolve no tables error = %v, exit=%d", err, ExitCode(err))
+	}
+
+	doc = cellUpdateTestDoc()
+	if _, _, err := resolveDocsTableWithIndex(doc, 2); err == nil || ExitCode(err) != 2 {
+		t.Fatalf("resolve out of range error = %v, exit=%d", err, ExitCode(err))
+	}
+
+	cmd := &DocsTableColumnWidthCmd{Col: 3, Width: 120}
+	if _, err := cmd.buildRequest(5, 2, ""); err == nil || ExitCode(err) != 2 {
+		t.Fatalf("col out of range error = %v, exit=%d", err, ExitCode(err))
 	}
 }
 
