@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -10,12 +11,7 @@ import (
 	"github.com/steipete/gogcli/internal/secrets"
 )
 
-var (
-	openSecretsStoreForAccount = secrets.OpenDefault
-	warnDirectAccessToken      = func() {
-		_, _ = fmt.Fprintln(os.Stderr, directAccessTokenWarning)
-	}
-)
+var openSecretsStoreForAccount = secrets.OpenDefault
 
 const (
 	accessTokenPlaceholderAccount = "access-token-user"
@@ -161,10 +157,17 @@ func hasDirectAccessToken(flags *RootFlags) bool {
 
 func finalizeRequiredAccount(flags *RootFlags, account string) string {
 	if hasDirectAccessToken(flags) {
-		warnDirectAccessToken()
+		_, _ = fmt.Fprintln(accountDiagnostics(flags), directAccessTokenWarning)
 	}
 
 	return account
+}
+
+func accountDiagnostics(flags *RootFlags) io.Writer {
+	if flags == nil || flags.diagnostics == nil {
+		return io.Discard
+	}
+	return flags.diagnostics
 }
 
 func resolveAccountAlias(value string) (string, bool, error) {

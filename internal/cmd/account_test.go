@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/steipete/gogcli/internal/config"
@@ -219,12 +220,8 @@ func TestRequireAccount_MissingWhenMultipleTokensAndNoDefault(t *testing.T) {
 
 func TestRequireAccount_AccessTokenNoAccount(t *testing.T) {
 	t.Setenv("GOG_ACCOUNT", "")
-	flags := &RootFlags{AccessToken: "ya29.some-token"}
-
-	var warned bool
-	prevWarn := warnDirectAccessToken
-	t.Cleanup(func() { warnDirectAccessToken = prevWarn })
-	warnDirectAccessToken = func() { warned = true }
+	var diagnostics strings.Builder
+	flags := &RootFlags{AccessToken: "ya29.some-token", diagnostics: &diagnostics}
 
 	prev := openSecretsStoreForAccount
 	t.Cleanup(func() { openSecretsStoreForAccount = prev })
@@ -240,18 +237,18 @@ func TestRequireAccount_AccessTokenNoAccount(t *testing.T) {
 	if got != accessTokenPlaceholderAccount {
 		t.Fatalf("got %q", got)
 	}
-	if !warned {
-		t.Fatalf("expected warning")
+	if !strings.Contains(diagnostics.String(), directAccessTokenWarning) {
+		t.Fatalf("expected warning, got %q", diagnostics.String())
 	}
 }
 
 func TestRequireAccount_AccessTokenWithExplicitAccount(t *testing.T) {
-	flags := &RootFlags{AccessToken: "ya29.some-token", Account: "explicit@example.com"}
-
-	var warned bool
-	prevWarn := warnDirectAccessToken
-	t.Cleanup(func() { warnDirectAccessToken = prevWarn })
-	warnDirectAccessToken = func() { warned = true }
+	var diagnostics strings.Builder
+	flags := &RootFlags{
+		AccessToken: "ya29.some-token",
+		Account:     "explicit@example.com",
+		diagnostics: &diagnostics,
+	}
 
 	got, err := requireAccount(flags)
 	if err != nil {
@@ -260,7 +257,7 @@ func TestRequireAccount_AccessTokenWithExplicitAccount(t *testing.T) {
 	if got != "explicit@example.com" {
 		t.Fatalf("got %q", got)
 	}
-	if !warned {
-		t.Fatalf("expected warning")
+	if !strings.Contains(diagnostics.String(), directAccessTokenWarning) {
+		t.Fatalf("expected warning, got %q", diagnostics.String())
 	}
 }

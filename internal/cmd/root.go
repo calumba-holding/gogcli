@@ -48,6 +48,7 @@ type RootFlags struct {
 	Force               bool   `help:"Skip confirmations for destructive commands" aliases:"yes,assume-yes" short:"y"`
 	NoInput             bool   `help:"Never prompt; fail instead (useful for CI)" aliases:"non-interactive,noninteractive"`
 	Verbose             bool   `help:"Enable verbose logging" short:"v"`
+	diagnostics         io.Writer
 }
 
 type CLI struct {
@@ -154,6 +155,7 @@ func executeWithRuntime(args []string, runtime *app.Runtime) (err error) {
 	if err != nil {
 		return reportEarlyError(runtimeIO.Err, wrapParseError(err))
 	}
+	cli.diagnostics = runtimeIO.Err
 	applyExplicitOutputModePrecedence(kctx, &cli.RootFlags)
 	if !preHomeApplied && strings.TrimSpace(cli.Home) != "" {
 		restoreHome, homeErr := config.SetHomeOverride(cli.Home)
