@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -274,7 +273,7 @@ func getDriveComment(ctx context.Context, svc *drive.Service, fileID, commentID 
 
 func writeDriveCommentDetail(ctx context.Context, u *ui.UI, comment *drive.Comment, includeAnchor, includeReplyDetails bool) error {
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{"comment": comment})
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), map[string]any{"comment": comment})
 	}
 
 	u.Out().Linef("id\t%s", comment.Id)
@@ -336,7 +335,7 @@ func updateDriveComment(ctx context.Context, svc *drive.Service, fileID, comment
 
 func writeDriveCommentMutation(ctx context.Context, u *ui.UI, comment *drive.Comment, includeAnchor bool) error {
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{"comment": comment})
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), map[string]any{"comment": comment})
 	}
 	u.Out().Linef("id\t%s", comment.Id)
 	u.Out().Linef("content\t%s", comment.Content)
@@ -398,9 +397,9 @@ func writeDriveReplyMutationWithAction(ctx context.Context, u *ui.UI, reply *dri
 			case driveReplyActionResolve, "":
 				envelope["resolved"] = true
 			}
-			return outfmt.WriteJSON(ctx, os.Stdout, envelope)
+			return outfmt.WriteJSON(ctx, stdoutWriter(ctx), envelope)
 		}
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{"reply": reply})
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), map[string]any{"reply": reply})
 	}
 
 	if resolved {

@@ -67,10 +67,8 @@ func newResolveTestServer(t *testing.T) (*httptest.Server, *replyCapture) {
 	return srv, rc
 }
 
-func setupDriveServiceFromResolveServer(t *testing.T, srv *httptest.Server) {
+func driveServiceFromResolveServer(t *testing.T, srv *httptest.Server) *drive.Service {
 	t.Helper()
-	origNew := newDriveService
-	t.Cleanup(func() { newDriveService = origNew })
 
 	svc, err := drive.NewService(context.Background(),
 		option.WithoutAuthentication(),
@@ -80,7 +78,7 @@ func setupDriveServiceFromResolveServer(t *testing.T, srv *httptest.Server) {
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}
-	newDriveService = func(context.Context, string) (*drive.Service, error) { return svc, nil }
+	return svc
 }
 
 // TestDriveCommentsReply_WithActionResolve verifies that
@@ -90,15 +88,12 @@ func setupDriveServiceFromResolveServer(t *testing.T, srv *httptest.Server) {
 func TestDriveCommentsReply_WithActionResolve(t *testing.T) {
 	srv, rc := newResolveTestServer(t)
 	defer srv.Close()
-	setupDriveServiceFromResolveServer(t, srv)
+	svc := driveServiceFromResolveServer(t, srv)
 
-	out := captureStdout(t, func() {
-		_ = captureStderr(t, func() {
-			if err := Execute([]string{"--json", "--account", "a@b.com", "drive", "comments", "reply", "file1", "c1", "Resolving with context", "--action", "resolve"}); err != nil {
-				t.Fatalf("Execute: %v", err)
-			}
-		})
-	})
+	result := executeWithDriveTestService(t, []string{"--json", "--account", "a@b.com", "drive", "comments", "reply", "file1", "c1", "Resolving with context", "--action", "resolve"}, svc)
+	if result.err != nil {
+		t.Fatalf("Execute: %v\nstderr=%s", result.err, result.stderr)
+	}
 
 	gotContent, gotAction, gotFields := rc.snapshot()
 	if gotContent != "Resolving with context" {
@@ -116,8 +111,8 @@ func TestDriveCommentsReply_WithActionResolve(t *testing.T) {
 		FileID    string `json:"fileId"`
 		CommentID string `json:"commentId"`
 	}
-	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
-		t.Fatalf("json parse: %v\nout=%q", err, out)
+	if err := json.Unmarshal([]byte(result.stdout), &parsed); err != nil {
+		t.Fatalf("json parse: %v\nout=%q", err, result.stdout)
 	}
 	if !parsed.Resolved || parsed.FileID != "file1" || parsed.CommentID != "c1" {
 		t.Fatalf("unexpected envelope: %#v", parsed)
@@ -129,15 +124,12 @@ func TestDriveCommentsReply_WithActionResolve(t *testing.T) {
 func TestDriveCommentsReply_WithActionReopen(t *testing.T) {
 	srv, rc := newResolveTestServer(t)
 	defer srv.Close()
-	setupDriveServiceFromResolveServer(t, srv)
+	svc := driveServiceFromResolveServer(t, srv)
 
-	out := captureStdout(t, func() {
-		_ = captureStderr(t, func() {
-			if err := Execute([]string{"--json", "--account", "a@b.com", "drive", "comments", "reply", "file1", "c1", "Reopening - needs more discussion", "--action", "reopen"}); err != nil {
-				t.Fatalf("Execute: %v", err)
-			}
-		})
-	})
+	result := executeWithDriveTestService(t, []string{"--json", "--account", "a@b.com", "drive", "comments", "reply", "file1", "c1", "Reopening - needs more discussion", "--action", "reopen"}, svc)
+	if result.err != nil {
+		t.Fatalf("Execute: %v\nstderr=%s", result.err, result.stderr)
+	}
 
 	_, gotAction, _ := rc.snapshot()
 	if gotAction != "reopen" {
@@ -145,8 +137,8 @@ func TestDriveCommentsReply_WithActionReopen(t *testing.T) {
 	}
 
 	var parsed map[string]any
-	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
-		t.Fatalf("json parse: %v out=%q", err, out)
+	if err := json.Unmarshal([]byte(result.stdout), &parsed); err != nil {
+		t.Fatalf("json parse: %v out=%q", err, result.stdout)
 	}
 	if parsed["reopened"] != true {
 		t.Fatalf("expected reopened=true in envelope, got: %#v", parsed)
@@ -159,15 +151,12 @@ func TestDriveCommentsReply_WithActionReopen(t *testing.T) {
 func TestDriveCommentsReply_NoActionUnchanged(t *testing.T) {
 	srv, rc := newResolveTestServer(t)
 	defer srv.Close()
-	setupDriveServiceFromResolveServer(t, srv)
+	svc := driveServiceFromResolveServer(t, srv)
 
-	out := captureStdout(t, func() {
-		_ = captureStderr(t, func() {
-			if err := Execute([]string{"--json", "--account", "a@b.com", "drive", "comments", "reply", "file1", "c1", "Just a reply"}); err != nil {
-				t.Fatalf("Execute: %v", err)
-			}
-		})
-	})
+	result := executeWithDriveTestService(t, []string{"--json", "--account", "a@b.com", "drive", "comments", "reply", "file1", "c1", "Just a reply"}, svc)
+	if result.err != nil {
+		t.Fatalf("Execute: %v\nstderr=%s", result.err, result.stderr)
+	}
 
 	_, gotAction, _ := rc.snapshot()
 	if gotAction != "" {
@@ -175,8 +164,8 @@ func TestDriveCommentsReply_NoActionUnchanged(t *testing.T) {
 	}
 
 	var parsed map[string]any
-	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
-		t.Fatalf("json parse: %v out=%q", err, out)
+	if err := json.Unmarshal([]byte(result.stdout), &parsed); err != nil {
+		t.Fatalf("json parse: %v out=%q", err, result.stdout)
 	}
 	if _, hasResolved := parsed["resolved"]; hasResolved {
 		t.Fatalf("expected no resolved key in plain reply envelope, got: %#v", parsed)
@@ -190,15 +179,12 @@ func TestDriveCommentsReply_NoActionUnchanged(t *testing.T) {
 func TestDriveCommentsResolveCmd_PostsResolveAction(t *testing.T) {
 	srv, rc := newResolveTestServer(t)
 	defer srv.Close()
-	setupDriveServiceFromResolveServer(t, srv)
+	svc := driveServiceFromResolveServer(t, srv)
 
-	out := captureStdout(t, func() {
-		_ = captureStderr(t, func() {
-			if err := Execute([]string{"--json", "--account", "a@b.com", "drive", "comments", "resolve", "file1", "c1", "--message", "LGTM"}); err != nil {
-				t.Fatalf("Execute: %v", err)
-			}
-		})
-	})
+	result := executeWithDriveTestService(t, []string{"--json", "--account", "a@b.com", "drive", "comments", "resolve", "file1", "c1", "--message", "LGTM"}, svc)
+	if result.err != nil {
+		t.Fatalf("Execute: %v\nstderr=%s", result.err, result.stderr)
+	}
 
 	gotContent, gotAction, _ := rc.snapshot()
 	if gotAction != "resolve" {
@@ -213,8 +199,8 @@ func TestDriveCommentsResolveCmd_PostsResolveAction(t *testing.T) {
 		FileID    string `json:"fileId"`
 		CommentID string `json:"commentId"`
 	}
-	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
-		t.Fatalf("json parse: %v\nout=%q", err, out)
+	if err := json.Unmarshal([]byte(result.stdout), &parsed); err != nil {
+		t.Fatalf("json parse: %v\nout=%q", err, result.stdout)
 	}
 	if !parsed.Resolved || parsed.FileID != "file1" || parsed.CommentID != "c1" {
 		t.Fatalf("unexpected envelope: %#v", parsed)
@@ -226,15 +212,12 @@ func TestDriveCommentsResolveCmd_PostsResolveAction(t *testing.T) {
 func TestDriveCommentsResolveCmd_NoMessage(t *testing.T) {
 	srv, rc := newResolveTestServer(t)
 	defer srv.Close()
-	setupDriveServiceFromResolveServer(t, srv)
+	svc := driveServiceFromResolveServer(t, srv)
 
-	_ = captureStdout(t, func() {
-		_ = captureStderr(t, func() {
-			if err := Execute([]string{"--account", "a@b.com", "drive", "comments", "resolve", "file1", "c1"}); err != nil {
-				t.Fatalf("Execute: %v", err)
-			}
-		})
-	})
+	result := executeWithDriveTestService(t, []string{"--account", "a@b.com", "drive", "comments", "resolve", "file1", "c1"}, svc)
+	if result.err != nil {
+		t.Fatalf("Execute: %v\nstderr=%s", result.err, result.stderr)
+	}
 
 	gotContent, gotAction, _ := rc.snapshot()
 	if gotAction != "resolve" {
@@ -249,15 +232,12 @@ func TestDriveCommentsResolveCmd_NoMessage(t *testing.T) {
 func TestDriveCommentsReopenCmd_PostsReopenAction(t *testing.T) {
 	srv, rc := newResolveTestServer(t)
 	defer srv.Close()
-	setupDriveServiceFromResolveServer(t, srv)
+	svc := driveServiceFromResolveServer(t, srv)
 
-	out := captureStdout(t, func() {
-		_ = captureStderr(t, func() {
-			if err := Execute([]string{"--json", "--account", "a@b.com", "drive", "comments", "reopen", "file1", "c1"}); err != nil {
-				t.Fatalf("Execute: %v", err)
-			}
-		})
-	})
+	result := executeWithDriveTestService(t, []string{"--json", "--account", "a@b.com", "drive", "comments", "reopen", "file1", "c1"}, svc)
+	if result.err != nil {
+		t.Fatalf("Execute: %v\nstderr=%s", result.err, result.stderr)
+	}
 
 	_, gotAction, _ := rc.snapshot()
 	if gotAction != "reopen" {
@@ -265,8 +245,8 @@ func TestDriveCommentsReopenCmd_PostsReopenAction(t *testing.T) {
 	}
 
 	var parsed map[string]any
-	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
-		t.Fatalf("json parse: %v out=%q", err, out)
+	if err := json.Unmarshal([]byte(result.stdout), &parsed); err != nil {
+		t.Fatalf("json parse: %v out=%q", err, result.stdout)
 	}
 	if parsed["reopened"] != true {
 		t.Fatalf("expected reopened=true, got: %#v", parsed)
@@ -339,15 +319,12 @@ func TestDocsCommentsReopenCmd_PostsReopenAction(t *testing.T) {
 		http.NotFound(w, r)
 	}))
 	defer srv.Close()
-	setupDriveServiceFromResolveServer(t, srv)
+	svc := driveServiceFromResolveServer(t, srv)
 
-	out := captureStdout(t, func() {
-		_ = captureStderr(t, func() {
-			if err := Execute([]string{"--json", "--account", "a@b.com", "docs", "comments", "reopen", "doc1", "c1", "--message", "still open"}); err != nil {
-				t.Fatalf("Execute: %v", err)
-			}
-		})
-	})
+	result := executeWithDriveTestService(t, []string{"--json", "--account", "a@b.com", "docs", "comments", "reopen", "doc1", "c1", "--message", "still open"}, svc)
+	if result.err != nil {
+		t.Fatalf("Execute: %v\nstderr=%s", result.err, result.stderr)
+	}
 
 	gotContent, gotAction, _ := rc.snapshot()
 	if gotAction != "reopen" {
@@ -358,8 +335,8 @@ func TestDocsCommentsReopenCmd_PostsReopenAction(t *testing.T) {
 	}
 
 	var parsed map[string]any
-	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
-		t.Fatalf("json parse: %v out=%q", err, out)
+	if err := json.Unmarshal([]byte(result.stdout), &parsed); err != nil {
+		t.Fatalf("json parse: %v out=%q", err, result.stdout)
 	}
 	if parsed["reopened"] != true {
 		t.Fatalf("expected reopened=true in docs reopen envelope, got: %#v", parsed)
