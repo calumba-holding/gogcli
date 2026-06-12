@@ -97,12 +97,12 @@ func TestRunImageReplace_NoImages(t *testing.T) {
 	}
 	svc, cleanup := mockDocsServerWithImages(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	ref := &ImageRefPattern{ByPosition: true, Position: 1}
-	err := cmd.runImageReplace(context.Background(), u, "", "test-doc", ref, "text", false)
+	err := cmd.runImageReplace(ctx, u, "", "test-doc", ref, "text", false)
 	assert.NoError(t, err)
 }
 
@@ -110,12 +110,12 @@ func TestRunImageReplace_DeleteInlineImage(t *testing.T) {
 	doc := buildDocWithInlineImage()
 	svc, cleanup := mockDocsServerWithImages(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	ref := &ImageRefPattern{ByPosition: true, Position: 1}
-	err := cmd.runImageReplace(context.Background(), u, "", "test-doc", ref, "", false)
+	err := cmd.runImageReplace(ctx, u, "", "test-doc", ref, "", false)
 	assert.NoError(t, err)
 }
 
@@ -123,12 +123,12 @@ func TestRunImageReplace_ReplaceWithNewImage(t *testing.T) {
 	doc := buildDocWithInlineImage()
 	svc, cleanup := mockDocsServerWithImages(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	ref := &ImageRefPattern{ByPosition: true, Position: 1}
-	err := cmd.runImageReplace(context.Background(), u, "", "test-doc", ref, "!(https://example.com/new.png)", false)
+	err := cmd.runImageReplace(ctx, u, "", "test-doc", ref, "!(https://example.com/new.png)", false)
 	assert.NoError(t, err)
 }
 
@@ -136,12 +136,12 @@ func TestRunImageReplace_ReplaceWithText(t *testing.T) {
 	doc := buildDocWithInlineImage()
 	svc, cleanup := mockDocsServerWithImages(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	ref := &ImageRefPattern{ByPosition: true, Position: 1}
-	err := cmd.runImageReplace(context.Background(), u, "", "test-doc", ref, "replacement text", false)
+	err := cmd.runImageReplace(ctx, u, "", "test-doc", ref, "replacement text", false)
 	assert.NoError(t, err)
 }
 
@@ -149,12 +149,12 @@ func TestRunImageReplace_AllImages(t *testing.T) {
 	doc := buildDocWithInlineImage()
 	svc, cleanup := mockDocsServerWithImages(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	ref := &ImageRefPattern{ByPosition: true, AllImages: true}
-	err := cmd.runImageReplace(context.Background(), u, "", "test-doc", ref, "", true)
+	err := cmd.runImageReplace(ctx, u, "", "test-doc", ref, "", true)
 	assert.NoError(t, err)
 }
 
@@ -162,12 +162,12 @@ func TestRunImageReplace_NoMatch(t *testing.T) {
 	doc := buildDocWithInlineImage()
 	svc, cleanup := mockDocsServerWithImages(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	ref := &ImageRefPattern{ByPosition: true, Position: 99}
-	err := cmd.runImageReplace(context.Background(), u, "", "test-doc", ref, "text", false)
+	err := cmd.runImageReplace(ctx, u, "", "test-doc", ref, "text", false)
 	assert.NoError(t, err)
 }
 
@@ -179,12 +179,12 @@ func TestRunTableOp_DeleteTable(t *testing.T) {
 	doc := buildDocWithTable("pre", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "post")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{tableRef: 1, replacement: ""}
-	err := cmd.runTableOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableOp(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -192,12 +192,12 @@ func TestRunTableOp_OutOfRange(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{tableRef: 99, replacement: ""}
-	err := cmd.runTableOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableOp(ctx, u, "", "test-doc-id", expr)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "out of range")
 	assert.Equal(t, 2, ExitCode(err))
@@ -207,12 +207,12 @@ func TestRunTableOp_NoTables(t *testing.T) {
 	doc := buildDoc(para(plain("no tables")))
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{tableRef: 1, replacement: ""}
-	err := cmd.runTableOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableOp(ctx, u, "", "test-doc-id", expr)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no tables")
 	assert.Equal(t, 2, ExitCode(err))
@@ -226,7 +226,7 @@ func TestRunTableCellReplace_WholeCell(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"old", "keep"}, {"keep", "keep"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
@@ -234,7 +234,7 @@ func TestRunTableCellReplace_WholeCell(t *testing.T) {
 		cellRef:     &tableCellRef{tableIndex: 1, row: 1, col: 1},
 		replacement: "new",
 	}
-	err := cmd.runTableCellReplace(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableCellReplace(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -242,7 +242,7 @@ func TestRunTableCellReplace_WithPattern(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"hello world", "keep"}, {"keep", "keep"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
@@ -251,7 +251,7 @@ func TestRunTableCellReplace_WithPattern(t *testing.T) {
 		pattern:     "hello",
 		replacement: "goodbye",
 	}
-	err := cmd.runTableCellReplace(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableCellReplace(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -259,7 +259,7 @@ func TestRunTableCellReplace_CellNotFound(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
@@ -267,7 +267,7 @@ func TestRunTableCellReplace_CellNotFound(t *testing.T) {
 		cellRef:     &tableCellRef{tableIndex: 1, row: 99, col: 1},
 		replacement: "x",
 	}
-	err := cmd.runTableCellReplace(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableCellReplace(ctx, u, "", "test-doc-id", expr)
 	assert.Error(t, err)
 	assert.Equal(t, 2, ExitCode(err))
 }
@@ -280,14 +280,14 @@ func TestRunTableRowColOp_InsertRow(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{
 		cellRef: &tableCellRef{tableIndex: 1, rowOp: opInsert, opTarget: 1},
 	}
-	err := cmd.runTableRowColOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableRowColOp(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -295,14 +295,14 @@ func TestRunTableRowColOp_DeleteRow(t *testing.T) {
 	doc := buildDocWithTable("", 3, 2, [][]string{{"a", "b"}, {"c", "d"}, {"e", "f"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{
 		cellRef: &tableCellRef{tableIndex: 1, rowOp: opDelete, opTarget: 2},
 	}
-	err := cmd.runTableRowColOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableRowColOp(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -310,14 +310,14 @@ func TestRunTableRowColOp_InsertCol(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{
 		cellRef: &tableCellRef{tableIndex: 1, colOp: opInsert, opTarget: 1},
 	}
-	err := cmd.runTableRowColOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableRowColOp(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -325,14 +325,14 @@ func TestRunTableRowColOp_DeleteCol(t *testing.T) {
 	doc := buildDocWithTable("", 2, 3, [][]string{{"a", "b", "c"}, {"d", "e", "f"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{
 		cellRef: &tableCellRef{tableIndex: 1, colOp: opDelete, opTarget: 2},
 	}
-	err := cmd.runTableRowColOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableRowColOp(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -340,14 +340,14 @@ func TestRunTableRowColOp_NoTables(t *testing.T) {
 	doc := buildDoc(para(plain("no tables")))
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{
 		cellRef: &tableCellRef{tableIndex: 1, rowOp: opInsert, opTarget: 1},
 	}
-	err := cmd.runTableRowColOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableRowColOp(ctx, u, "", "test-doc-id", expr)
 	assert.Error(t, err)
 	assert.Equal(t, 2, ExitCode(err))
 }
@@ -356,14 +356,14 @@ func TestRunTableRowColOp_RowOutOfRange(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{
 		cellRef: &tableCellRef{tableIndex: 1, rowOp: opDelete, opTarget: 99},
 	}
-	err := cmd.runTableRowColOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableRowColOp(ctx, u, "", "test-doc-id", expr)
 	assert.Error(t, err)
 	assert.Equal(t, 2, ExitCode(err))
 }
@@ -372,14 +372,14 @@ func TestRunTableRowColOp_DeleteOnlyRow(t *testing.T) {
 	doc := buildDocWithTable("", 1, 2, [][]string{{"a", "b"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{
 		cellRef: &tableCellRef{tableIndex: 1, rowOp: opDelete, opTarget: 1},
 	}
-	err := cmd.runTableRowColOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableRowColOp(ctx, u, "", "test-doc-id", expr)
 	assert.Error(t, err)
 	assert.Equal(t, 2, ExitCode(err))
 }
@@ -388,14 +388,14 @@ func TestRunTableRowColOp_AppendRow(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{
 		cellRef: &tableCellRef{tableIndex: 1, rowOp: opAppend, opTarget: 0},
 	}
-	err := cmd.runTableRowColOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableRowColOp(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -403,14 +403,14 @@ func TestRunTableRowColOp_AppendCol(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{
 		cellRef: &tableCellRef{tableIndex: 1, colOp: opAppend, opTarget: 0},
 	}
-	err := cmd.runTableRowColOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableRowColOp(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -418,14 +418,14 @@ func TestRunTableRowColOp_NegativeTableIndex(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{
 		cellRef: &tableCellRef{tableIndex: -1, rowOp: opInsert, opTarget: 1},
 	}
-	err := cmd.runTableRowColOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableRowColOp(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -433,14 +433,14 @@ func TestRunTableRowColOp_NegativeRowTarget(t *testing.T) {
 	doc := buildDocWithTable("", 3, 2, [][]string{{"a", "b"}, {"c", "d"}, {"e", "f"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{
 		cellRef: &tableCellRef{tableIndex: 1, rowOp: opDelete, opTarget: -1},
 	}
-	err := cmd.runTableRowColOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableRowColOp(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -462,12 +462,12 @@ func TestRunPositionalInsert_EmptyDocInsert(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{pattern: "^$", replacement: "Hello new content"}
-	handled, err := cmd.runPositionalInsert(context.Background(), u, "", "test-doc", expr)
+	handled, err := cmd.runPositionalInsert(ctx, u, "", "test-doc", expr)
 	assert.True(t, handled)
 	assert.NoError(t, err)
 }
@@ -486,12 +486,12 @@ func TestRunPositionalInsert_ClearNonEmpty(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{pattern: "^$", replacement: ""}
-	handled, err := cmd.runPositionalInsert(context.Background(), u, "", "test-doc", expr)
+	handled, err := cmd.runPositionalInsert(ctx, u, "", "test-doc", expr)
 	assert.True(t, handled)
 	assert.NoError(t, err)
 }
@@ -510,12 +510,12 @@ func TestRunPositionalInsert_NonEmptyWithReplacement(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{pattern: "^$", replacement: "ignored"}
-	handled, err := cmd.runPositionalInsert(context.Background(), u, "", "test-doc", expr)
+	handled, err := cmd.runPositionalInsert(ctx, u, "", "test-doc", expr)
 	assert.True(t, handled)
 	assert.NoError(t, err)
 }
@@ -533,12 +533,12 @@ func TestRunPositionalInsert_Prepend(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{pattern: "^", replacement: "Prepended: "}
-	handled, err := cmd.runPositionalInsert(context.Background(), u, "", "test-doc", expr)
+	handled, err := cmd.runPositionalInsert(ctx, u, "", "test-doc", expr)
 	assert.True(t, handled)
 	assert.NoError(t, err)
 }
@@ -556,12 +556,12 @@ func TestRunPositionalInsert_Append(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{pattern: "$", replacement: "\\nAppended text"}
-	handled, err := cmd.runPositionalInsert(context.Background(), u, "", "test-doc", expr)
+	handled, err := cmd.runPositionalInsert(ctx, u, "", "test-doc", expr)
 	assert.True(t, handled)
 	assert.NoError(t, err)
 }
@@ -589,12 +589,12 @@ func TestRunPositionalInsert_EmptyDocClearNoOp(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{pattern: "^$", replacement: ""}
-	handled, err := cmd.runPositionalInsert(context.Background(), u, "", "test-doc", expr)
+	handled, err := cmd.runPositionalInsert(ctx, u, "", "test-doc", expr)
 	assert.True(t, handled)
 	assert.NoError(t, err)
 }
@@ -688,12 +688,12 @@ func TestRunSingle_Transliterate(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr, _ := parseYCommand("y/abc/ABC/")
-	err := cmd.runSingle(context.Background(), u, "", "test-doc", expr)
+	err := cmd.runSingle(ctx, u, "", "test-doc", expr)
 	assert.NoError(t, err)
 }
 
@@ -701,12 +701,12 @@ func TestRunSingle_TableRef(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{tableRef: 1, replacement: ""}
-	err := cmd.runSingle(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runSingle(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -723,12 +723,12 @@ func TestRunSingle_PositionalPrepend(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{pattern: "^", replacement: "prefix "}
-	err := cmd.runSingle(context.Background(), u, "", "test-doc", expr)
+	err := cmd.runSingle(ctx, u, "", "test-doc", expr)
 	assert.NoError(t, err)
 }
 
@@ -736,7 +736,7 @@ func TestRunSingle_CellRef(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"old", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
@@ -744,7 +744,7 @@ func TestRunSingle_CellRef(t *testing.T) {
 		cellRef:     &tableCellRef{tableIndex: 1, row: 1, col: 1},
 		replacement: "new",
 	}
-	err := cmd.runSingle(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runSingle(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -752,12 +752,12 @@ func TestRunSingle_TableCreate(t *testing.T) {
 	doc := buildDoc(para(plain("PLACEHOLDER")))
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{pattern: "PLACEHOLDER", replacement: "|3x2|"}
-	err := cmd.runSingle(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runSingle(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -765,12 +765,12 @@ func TestRunSingle_ImagePattern(t *testing.T) {
 	doc := buildDocWithInlineImage()
 	svc, cleanup := mockDocsServerWithImages(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{pattern: "!(1)", replacement: ""}
-	err := cmd.runSingle(context.Background(), u, "", "test-doc", expr)
+	err := cmd.runSingle(ctx, u, "", "test-doc", expr)
 	assert.NoError(t, err)
 }
 
@@ -787,12 +787,12 @@ func TestRunSingle_InsertCommand(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr, _ := parseAICommand("i/target/before/", 'i')
-	err := cmd.runSingle(context.Background(), u, "", "test-doc", expr)
+	err := cmd.runSingle(ctx, u, "", "test-doc", expr)
 	assert.NoError(t, err)
 }
 
@@ -809,12 +809,12 @@ func TestRunSingle_AppendCommand(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr, _ := parseAICommand("a/target/after/", 'a')
-	err := cmd.runSingle(context.Background(), u, "", "test-doc", expr)
+	err := cmd.runSingle(ctx, u, "", "test-doc", expr)
 	assert.NoError(t, err)
 }
 
@@ -822,7 +822,7 @@ func TestRunSingle_MergeOp(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
@@ -830,7 +830,7 @@ func TestRunSingle_MergeOp(t *testing.T) {
 		cellRef:     &tableCellRef{tableIndex: 1, row: 1, col: 1, endRow: 2, endCol: 2},
 		replacement: "merge",
 	}
-	err := cmd.runSingle(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runSingle(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -842,7 +842,7 @@ func TestRunBatch_CellExpressions(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"old1", "old2"}, {"old3", "old4"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
@@ -850,7 +850,7 @@ func TestRunBatch_CellExpressions(t *testing.T) {
 		{cellRef: &tableCellRef{tableIndex: 1, row: 1, col: 1}, replacement: "new1"},
 		{cellRef: &tableCellRef{tableIndex: 1, row: 1, col: 2}, replacement: "new2"},
 	}
-	err := cmd.runBatch(context.Background(), u, "", "test-doc-id", exprs)
+	err := cmd.runBatch(ctx, u, "", "test-doc-id", exprs)
 	assert.NoError(t, err)
 }
 
@@ -867,7 +867,7 @@ func TestRunBatch_WithPositional(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
@@ -875,7 +875,7 @@ func TestRunBatch_WithPositional(t *testing.T) {
 		{pattern: "$", replacement: "\\nappended"},
 		{pattern: "foo", replacement: "bar", global: true},
 	}
-	err := cmd.runBatch(context.Background(), u, "", "test-doc", exprs)
+	err := cmd.runBatch(ctx, u, "", "test-doc", exprs)
 	assert.NoError(t, err)
 }
 
@@ -883,7 +883,7 @@ func TestRunBatch_WithManualFormatting(t *testing.T) {
 	doc := buildDoc(para(plain("hello world")))
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
@@ -891,7 +891,7 @@ func TestRunBatch_WithManualFormatting(t *testing.T) {
 		{pattern: "hello", replacement: "**hello**"},
 		{pattern: "world", replacement: "*world*"},
 	}
-	err := cmd.runBatch(context.Background(), u, "", "test-doc-id", exprs)
+	err := cmd.runBatch(ctx, u, "", "test-doc-id", exprs)
 	assert.NoError(t, err)
 }
 
@@ -908,7 +908,7 @@ func TestRunBatch_WithCommand(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
@@ -916,7 +916,7 @@ func TestRunBatch_WithCommand(t *testing.T) {
 		{command: 'd', pattern: "delete"},
 		{pattern: "foo", replacement: "bar", global: true},
 	}
-	err := cmd.runBatch(context.Background(), u, "", "test-doc", exprs)
+	err := cmd.runBatch(ctx, u, "", "test-doc", exprs)
 	assert.NoError(t, err)
 }
 
@@ -924,13 +924,13 @@ func TestRunBatch_TableCreate(t *testing.T) {
 	doc := buildDoc(para(plain("TABLE_HERE")))
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	exprs := []sedExpr{
 		{pattern: "TABLE_HERE", replacement: "|2x3|"},
 	}
-	err := cmd.runBatch(context.Background(), u, "", "test-doc-id", exprs)
+	err := cmd.runBatch(ctx, u, "", "test-doc-id", exprs)
 	assert.NoError(t, err)
 }

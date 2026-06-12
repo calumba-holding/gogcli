@@ -2,17 +2,12 @@ package cmd
 
 import (
 	"context"
-	"io"
 	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/api/docs/v1"
-	"google.golang.org/api/option"
-
-	"github.com/steipete/gogcli/internal/outfmt"
-	"github.com/steipete/gogcli/internal/ui"
 )
 
 // =============================================================================
@@ -23,14 +18,14 @@ func TestProcessCellExprs_RowOp(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	cellExprs := []indexedExpr{
 		{index: 0, expr: sedExpr{cellRef: &tableCellRef{tableIndex: 1, rowOp: opInsert, opTarget: 1}}},
 	}
-	count, err := cmd.processCellExprs(context.Background(), u, "", "test-doc-id", cellExprs)
+	count, err := cmd.processCellExprs(ctx, u, "", "test-doc-id", cellExprs)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
@@ -39,14 +34,14 @@ func TestProcessCellExprs_SingleCell(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"old", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	cellExprs := []indexedExpr{
 		{index: 0, expr: sedExpr{cellRef: &tableCellRef{tableIndex: 1, row: 1, col: 1}, replacement: "new"}},
 	}
-	count, err := cmd.processCellExprs(context.Background(), u, "", "test-doc-id", cellExprs)
+	count, err := cmd.processCellExprs(ctx, u, "", "test-doc-id", cellExprs)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
@@ -55,7 +50,7 @@ func TestProcessCellExprs_BatchCells(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
@@ -64,7 +59,7 @@ func TestProcessCellExprs_BatchCells(t *testing.T) {
 		{index: 1, expr: sedExpr{cellRef: &tableCellRef{tableIndex: 1, row: 1, col: 2}, replacement: "B"}},
 		{index: 2, expr: sedExpr{cellRef: &tableCellRef{tableIndex: 1, row: 2, col: 1}, replacement: "C"}},
 	}
-	count, err := cmd.processCellExprs(context.Background(), u, "", "test-doc-id", cellExprs)
+	count, err := cmd.processCellExprs(ctx, u, "", "test-doc-id", cellExprs)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, count)
 }
@@ -73,7 +68,7 @@ func TestProcessCellExprs_MergeOp(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
@@ -83,7 +78,7 @@ func TestProcessCellExprs_MergeOp(t *testing.T) {
 			replacement: "merge",
 		}},
 	}
-	count, err := cmd.processCellExprs(context.Background(), u, "", "test-doc-id", cellExprs)
+	count, err := cmd.processCellExprs(ctx, u, "", "test-doc-id", cellExprs)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
@@ -92,14 +87,14 @@ func TestProcessCellExprs_TableRef(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	cellExprs := []indexedExpr{
 		{index: 0, expr: sedExpr{tableRef: 1, replacement: ""}},
 	}
-	count, err := cmd.processCellExprs(context.Background(), u, "", "test-doc-id", cellExprs)
+	count, err := cmd.processCellExprs(ctx, u, "", "test-doc-id", cellExprs)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
@@ -382,12 +377,12 @@ func TestRunManual_Simple(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{pattern: "hello", replacement: "world"}
-	err := cmd.runManual(context.Background(), u, "", "test-doc", expr)
+	err := cmd.runManual(ctx, u, "", "test-doc", expr)
 	assert.NoError(t, err)
 }
 
@@ -511,24 +506,12 @@ func TestSedIntegration_ImagePatternDelete(t *testing.T) {
 	})
 	defer srv.Close()
 
-	origNewDocs := newDocsService
-	newDocsService = func(ctx context.Context, account string) (*docs.Service, error) {
-		return docs.NewService(ctx,
-			option.WithoutAuthentication(),
-			option.WithEndpoint(srv.URL+"/"),
-		)
-	}
-	defer func() { newDocsService = origNewDocs }()
-
-	u, _ := ui.New(ui.Options{Stdout: io.Discard, Stderr: io.Discard, Color: "never"})
-	ctx := outfmt.WithMode(ui.WithUI(context.Background(), u), outfmt.Mode{JSON: true})
-
 	cmd := &DocsSedCmd{
 		DocID:      "test-doc",
 		Expression: "s/!(1)//",
 	}
 	flags := &RootFlags{Account: "test@example.com"}
-	err := cmd.Run(ctx, flags)
+	err := cmd.Run(newSedIntegrationContext(t, srv), flags)
 	assert.NoError(t, err)
 }
 
@@ -573,7 +556,7 @@ func TestRunTableCellReplace_WildcardRow(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
@@ -584,7 +567,7 @@ func TestRunTableCellReplace_WildcardRow(t *testing.T) {
 		replacement: "X",
 		global:      true,
 	}
-	err := cmd.runTableCellReplace(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableCellReplace(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -596,9 +579,9 @@ func TestFetchDoc(t *testing.T) {
 	doc := buildDoc(para(plain("hello")))
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
-	docsSvc, gotDoc, err := fetchDoc(context.Background(), "", "test-doc-id")
+	docsSvc, gotDoc, err := fetchDoc(ctx, "", "test-doc-id")
 	require.NoError(t, err)
 	assert.NotNil(t, docsSvc)
 	assert.NotNil(t, gotDoc)
@@ -621,14 +604,14 @@ func TestRunInsertAroundMatch_InsertWithFormatting(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 
 	// Test insert with bold formatting
 	expr, _ := parseAICommand("i/target/**bold text**/", 'i')
-	err := cmd.runInsertCommand(context.Background(), u, "", "test-doc", expr)
+	err := cmd.runInsertCommand(ctx, u, "", "test-doc", expr)
 	assert.NoError(t, err)
 }
 
@@ -645,12 +628,12 @@ func TestRunInsertAroundMatch_AppendWithTable(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr, _ := parseAICommand("a/target/|2x3|/", 'a')
-	err := cmd.runAppendCommand(context.Background(), u, "", "test-doc", expr)
+	err := cmd.runAppendCommand(ctx, u, "", "test-doc", expr)
 	assert.NoError(t, err)
 }
 
@@ -662,7 +645,7 @@ func TestRunTableMerge(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
@@ -670,7 +653,7 @@ func TestRunTableMerge(t *testing.T) {
 		cellRef:     &tableCellRef{tableIndex: 1, row: 1, col: 1, endRow: 2, endCol: 2},
 		replacement: "merge",
 	}
-	err := cmd.runTableMerge(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableMerge(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -682,12 +665,12 @@ func TestRunTableOp_NegativeIndex(t *testing.T) {
 	doc := buildDocWithTable("", 2, 2, [][]string{{"a", "b"}, {"c", "d"}}, "")
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
 	expr := sedExpr{tableRef: -1, replacement: ""}
-	err := cmd.runTableOp(context.Background(), u, "", "test-doc-id", expr)
+	err := cmd.runTableOp(ctx, u, "", "test-doc-id", expr)
 	assert.NoError(t, err)
 }
 
@@ -719,7 +702,7 @@ func TestRunDeleteCommand_GlobalFlag(t *testing.T) {
 	}
 	svc, cleanup := newSedTestServer(t, doc)
 	defer cleanup()
-	mockDocsService(t, svc)
+	ctx := mockDocsContext(t, svc)
 
 	cmd := &DocsSedCmd{}
 	u := sedTestUI()
@@ -727,7 +710,7 @@ func TestRunDeleteCommand_GlobalFlag(t *testing.T) {
 	require.NoError(t, err)
 	expr.global = true
 
-	err = cmd.runDeleteCommand(context.Background(), u, "", "test-doc", expr)
+	err = cmd.runDeleteCommand(ctx, u, "", "test-doc", expr)
 	assert.NoError(t, err)
 }
 
@@ -744,18 +727,6 @@ func TestSedIntegration_BatchMixedCellAndNative(t *testing.T) {
 	})
 	defer srv.Close()
 
-	origNewDocs := newDocsService
-	newDocsService = func(ctx context.Context, account string) (*docs.Service, error) {
-		return docs.NewService(ctx,
-			option.WithoutAuthentication(),
-			option.WithEndpoint(srv.URL+"/"),
-		)
-	}
-	defer func() { newDocsService = origNewDocs }()
-
-	u, _ := ui.New(ui.Options{Stdout: io.Discard, Stderr: io.Discard, Color: "never"})
-	ctx := outfmt.WithMode(ui.WithUI(context.Background(), u), outfmt.Mode{JSON: true})
-
 	cmd := &DocsSedCmd{
 		DocID: "test-doc-id",
 		Expressions: []string{
@@ -764,7 +735,7 @@ func TestSedIntegration_BatchMixedCellAndNative(t *testing.T) {
 		},
 	}
 	flags := &RootFlags{Account: "test@example.com"}
-	err := cmd.Run(ctx, flags)
+	err := cmd.Run(newSedIntegrationContext(t, srv), flags)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, captured)
 }
@@ -939,18 +910,6 @@ func TestSedIntegration_BatchWithImageReplacement(t *testing.T) {
 	})
 	defer srv.Close()
 
-	origNewDocs := newDocsService
-	newDocsService = func(ctx context.Context, account string) (*docs.Service, error) {
-		return docs.NewService(ctx,
-			option.WithoutAuthentication(),
-			option.WithEndpoint(srv.URL+"/"),
-		)
-	}
-	defer func() { newDocsService = origNewDocs }()
-
-	u, _ := ui.New(ui.Options{Stdout: io.Discard, Stderr: io.Discard, Color: "never"})
-	ctx := outfmt.WithMode(ui.WithUI(context.Background(), u), outfmt.Mode{JSON: true})
-
 	cmd := &DocsSedCmd{
 		DocID: "test-doc-id",
 		Expressions: []string{
@@ -959,6 +918,6 @@ func TestSedIntegration_BatchWithImageReplacement(t *testing.T) {
 		},
 	}
 	flags := &RootFlags{Account: "test@example.com"}
-	err := cmd.Run(ctx, flags)
+	err := cmd.Run(newSedIntegrationContext(t, srv), flags)
 	assert.NoError(t, err)
 }

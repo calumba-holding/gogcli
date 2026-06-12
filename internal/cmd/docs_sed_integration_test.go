@@ -12,9 +12,6 @@ import (
 
 	"google.golang.org/api/docs/v1"
 	"google.golang.org/api/option"
-
-	"github.com/steipete/gogcli/internal/outfmt"
-	"github.com/steipete/gogcli/internal/ui"
 )
 
 // mockDocsServerAdvanced creates a realistic mock Docs API server with multi-paragraph,
@@ -206,6 +203,18 @@ func para(runs ...textRun) testDocParagraph {
 	return testDocParagraph{runs: runs}
 }
 
+func newSedIntegrationContext(t *testing.T, srv *httptest.Server) context.Context {
+	t.Helper()
+	svc, err := docs.NewService(context.Background(),
+		option.WithoutAuthentication(),
+		option.WithEndpoint(srv.URL+"/"),
+	)
+	if err != nil {
+		t.Fatalf("docs.NewService: %v", err)
+	}
+	return withDocsTestService(newCmdRuntimeJSONOutputContext(t, io.Discard, io.Discard), svc)
+}
+
 // runSedIntegration runs a DocsSedCmd against a mock server and returns captured requests.
 func runSedIntegration(t *testing.T, doc *docs.Document, expression string, expressions []string) []*docs.Request {
 	t.Helper()
@@ -216,19 +225,6 @@ func runSedIntegration(t *testing.T, doc *docs.Document, expression string, expr
 	})
 	defer srv.Close()
 
-	// Override the docs service constructor to use our mock
-	origNewDocs := newDocsService
-	newDocsService = func(ctx context.Context, account string) (*docs.Service, error) {
-		return docs.NewService(ctx,
-			option.WithoutAuthentication(),
-			option.WithEndpoint(srv.URL+"/"),
-		)
-	}
-	defer func() { newDocsService = origNewDocs }()
-
-	u, _ := ui.New(ui.Options{Stdout: io.Discard, Stderr: io.Discard, Color: "never"})
-	ctx := outfmt.WithMode(ui.WithUI(context.Background(), u), outfmt.Mode{JSON: true})
-
 	cmd := &DocsSedCmd{
 		DocID:       "test-doc-id",
 		Expression:  expression,
@@ -237,7 +233,7 @@ func runSedIntegration(t *testing.T, doc *docs.Document, expression string, expr
 
 	flags := &RootFlags{Account: "test@example.com"}
 
-	err := cmd.Run(ctx, flags)
+	err := cmd.Run(newSedIntegrationContext(t, srv), flags)
 	if err != nil {
 		t.Fatalf("DocsSedCmd.Run failed: %v", err)
 	}
@@ -250,18 +246,6 @@ func runSedIntegrationErr(t *testing.T, doc *docs.Document, expression string, e
 	srv := mockDocsServerAdvanced(t, doc, nil)
 	defer srv.Close()
 
-	origNewDocs := newDocsService
-	newDocsService = func(ctx context.Context, account string) (*docs.Service, error) {
-		return docs.NewService(ctx,
-			option.WithoutAuthentication(),
-			option.WithEndpoint(srv.URL+"/"),
-		)
-	}
-	defer func() { newDocsService = origNewDocs }()
-
-	u, _ := ui.New(ui.Options{Stdout: io.Discard, Stderr: io.Discard, Color: "never"})
-	ctx := outfmt.WithMode(ui.WithUI(context.Background(), u), outfmt.Mode{JSON: true})
-
 	cmd := &DocsSedCmd{
 		DocID:       "test-doc-id",
 		Expression:  expression,
@@ -269,7 +253,7 @@ func runSedIntegrationErr(t *testing.T, doc *docs.Document, expression string, e
 	}
 
 	flags := &RootFlags{Account: "test@example.com"}
-	return cmd.Run(ctx, flags)
+	return cmd.Run(newSedIntegrationContext(t, srv), flags)
 }
 
 // =============================================================================
@@ -588,24 +572,12 @@ func TestSedIntegration_FileExpressions(t *testing.T) {
 	})
 	defer srv.Close()
 
-	origNewDocs := newDocsService
-	newDocsService = func(ctx context.Context, account string) (*docs.Service, error) {
-		return docs.NewService(ctx,
-			option.WithoutAuthentication(),
-			option.WithEndpoint(srv.URL+"/"),
-		)
-	}
-	defer func() { newDocsService = origNewDocs }()
-
-	u, _ := ui.New(ui.Options{Stdout: io.Discard, Stderr: io.Discard, Color: "never"})
-	ctx := outfmt.WithMode(ui.WithUI(context.Background(), u), outfmt.Mode{JSON: true})
-
 	cmd := &DocsSedCmd{
 		DocID: "test-doc-id",
 		File:  tmpFile.Name(),
 	}
 	flags := &RootFlags{Account: "test@example.com"}
-	if err := cmd.Run(ctx, flags); err != nil {
+	if err := cmd.Run(newSedIntegrationContext(t, srv), flags); err != nil {
 		t.Fatalf("Run with file: %v", err)
 	}
 
