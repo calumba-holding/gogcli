@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -248,7 +247,7 @@ func runDocsSingleInsert(ctx context.Context, flags *RootFlags, action string, l
 		for k, v := range payload {
 			result[k] = v
 		}
-		return outfmt.WriteJSON(ctx, os.Stdout, result)
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), result)
 	}
 	u.Out().Linef("documentId\t%s", resp.DocumentId)
 	u.Out().Linef("atIndex\t%d", insertIndex)

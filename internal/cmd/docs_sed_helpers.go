@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -143,7 +142,7 @@ func sedOutputOK(ctx context.Context, u *ui.UI, id string, extra ...sedOutputKV)
 		result[kv.Key] = kv.Value
 	}
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, result)
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), result)
 	}
 	u.Out().Linef("status\tok")
 	u.Out().Linef("docId\t%s", id)

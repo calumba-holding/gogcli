@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"google.golang.org/api/docs/v1"
@@ -104,7 +103,7 @@ func (c *DocsTableColumnWidthCmd) Run(ctx context.Context, flags *RootFlags) err
 		if c.Tab != "" {
 			payload["tabId"] = c.Tab
 		}
-		return outfmt.WriteJSON(ctx, os.Stdout, payload)
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), payload)
 	}
 	u.Out().Linef("documentId\t%s", resp.DocumentId)
 	u.Out().Linef("table_index\t%d", resolvedTableIndex)
