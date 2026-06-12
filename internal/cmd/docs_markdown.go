@@ -340,14 +340,14 @@ func isTableSeparator(line string) bool {
 		}
 		sawDashSegment = true
 	}
-	return sawDashSegment && len(segments) > 1
+	return sawDashSegment
 }
 
 // parseMarkdownTable parses a markdown table into rows of cells
 func parseMarkdownTable(lines []string) [][]string {
 	var rows [][]string
 
-	for _, line := range lines {
+	for lineIndex, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			break
@@ -355,8 +355,9 @@ func parseMarkdownTable(lines []string) [][]string {
 		if !strings.HasPrefix(line, "|") {
 			break
 		}
-		// Skip separator line
-		if isTableSeparator(line) {
+		// The parser only calls this after recognizing the second line as the
+		// table delimiter. Separator-shaped rows later in the table are data.
+		if lineIndex == 1 && isTableSeparator(line) {
 			continue
 		}
 
