@@ -419,6 +419,21 @@ func TestWaitForPollIntervalCanceled(t *testing.T) {
 	}
 }
 
+func TestRunJSONShellHookUsesRuntimeStderr(t *testing.T) {
+	command := "cat"
+	if os.PathSeparator == '\\' {
+		command = "more"
+	}
+	var diagnostics bytes.Buffer
+	ctx := newCmdRuntimeOutputContext(t, io.Discard, &diagnostics)
+	if err := runJSONShellHook(ctx, command, map[string]any{"event": "changed"}); err != nil {
+		t.Fatalf("runJSONShellHook: %v", err)
+	}
+	if got := diagnostics.String(); !strings.Contains(got, `"event":"changed"`) {
+		t.Fatalf("unexpected hook output: %q", got)
+	}
+}
+
 func newDrivePollTestContext(t *testing.T, svc *drive.Service, stdout io.Writer) context.Context {
 	t.Helper()
 	return withDriveTestService(newCmdRuntimeJSONOutputContext(t, stdout, io.Discard), svc)

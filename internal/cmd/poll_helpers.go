@@ -81,8 +81,8 @@ func runJSONShellHook(ctx context.Context, command string, payload any) error {
 		cmd = exec.CommandContext(ctx, "/bin/sh", "-c", command) //nolint:gosec // command is an explicit local operator-provided hook.
 	}
 	cmd.Stdin = bytes.NewReader(data)
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = stderrWriter(ctx)
+	cmd.Stderr = stderrWriter(ctx)
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
