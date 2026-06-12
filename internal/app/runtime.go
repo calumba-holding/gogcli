@@ -14,6 +14,8 @@ import (
 	"google.golang.org/api/cloudidentity/v1"
 	"google.golang.org/api/docs/v1"
 	"google.golang.org/api/drive/v3"
+	"google.golang.org/api/driveactivity/v2"
+	"google.golang.org/api/drivelabels/v2"
 	"google.golang.org/api/forms/v1"
 	"google.golang.org/api/gmail/v1"
 	"google.golang.org/api/keep/v1"
@@ -47,6 +49,8 @@ type (
 	DocsServiceFactory           func(context.Context, string) (*docs.Service, error)
 	DocsHTTPClientFactory        func(context.Context, string) (*http.Client, error)
 	DriveServiceFactory          func(context.Context, string) (*drive.Service, error)
+	DriveActivityServiceFactory  func(context.Context, string) (*driveactivity.Service, error)
+	DriveLabelsServiceFactory    func(context.Context, string) (*drivelabels.Service, error)
 	FormsServiceFactory          func(context.Context, string) (*forms.Service, error)
 	GmailServiceFactory          func(context.Context, string) (*gmail.Service, error)
 	KeepServiceAccountFactory    func(context.Context, string, string) (*keep.Service, error)
@@ -82,6 +86,8 @@ type Services struct {
 	Docs            DocsServiceFactory
 	DocsHTTP        DocsHTTPClientFactory
 	Drive           DriveServiceFactory
+	DriveActivity   DriveActivityServiceFactory
+	DriveLabels     DriveLabelsServiceFactory
 	Forms           FormsServiceFactory
 	Gmail           GmailServiceFactory
 	Keep            KeepServiceAccountFactory

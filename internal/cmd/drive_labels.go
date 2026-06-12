@@ -15,12 +15,9 @@ import (
 	gapi "google.golang.org/api/googleapi"
 
 	"github.com/steipete/gogcli/internal/errfmt"
-	"github.com/steipete/gogcli/internal/googleapi"
 	"github.com/steipete/gogcli/internal/outfmt"
 	"github.com/steipete/gogcli/internal/ui"
 )
-
-var newDriveLabelsService = googleapi.NewDriveLabels
 
 type DriveLabelsCmd struct {
 	List DriveLabelsListCmd `cmd:"" name:"list" aliases:"ls" help:"List Drive label schemas"`
@@ -198,7 +195,7 @@ func (c *DriveLabelsListCmd) Run(ctx context.Context, flags *RootFlags) error {
 	if err != nil {
 		return err
 	}
-	svc, err := newDriveLabelsService(ctx, account)
+	svc, err := driveLabelsService(ctx, account)
 	if err != nil {
 		return err
 	}
@@ -274,7 +271,7 @@ func (c *DriveLabelsGetCmd) Run(ctx context.Context, flags *RootFlags) error {
 	if name == "" {
 		return usage("empty label name")
 	}
-	svc, err := newDriveLabelsService(ctx, account)
+	svc, err := driveLabelsService(ctx, account)
 	if err != nil {
 		return err
 	}

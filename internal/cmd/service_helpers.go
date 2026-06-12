@@ -26,7 +26,7 @@ func requireDriveService(ctx context.Context, flags *RootFlags) (string, *drive.
 }
 
 func requireDriveActivityService(ctx context.Context, flags *RootFlags) (string, *driveactivity.Service, error) {
-	return requireGoogleService(ctx, flags, newDriveActivityService)
+	return requireGoogleService(ctx, flags, driveActivityService)
 }
 
 func requireCalendarService(ctx context.Context, flags *RootFlags) (string, *calendar.Service, error) {

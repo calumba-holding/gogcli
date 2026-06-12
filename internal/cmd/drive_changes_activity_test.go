@@ -148,22 +148,18 @@ func TestDriveActivityQuery(t *testing.T) {
 		})
 	}), driveactivity.NewService)
 	defer closeSrv()
-	stubGoogleTestService(t, &newDriveActivityService, svc)
 
-	if err := (&DriveActivityQueryCmd{File: "file1", Actions: "edit", Max: 10}).Run(newCmdOutputContext(t, io.Discard, io.Discard), &RootFlags{Account: "a@example.com"}); err != nil {
+	ctx := withDriveActivityTestService(newCmdRuntimeOutputContext(t, io.Discard, io.Discard), svc)
+	if err := (&DriveActivityQueryCmd{File: "file1", Actions: "edit", Max: 10}).Run(ctx, &RootFlags{Account: "a@example.com"}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 }
 
 func TestDriveActivityQueryValidationFailsBeforeService(t *testing.T) {
-	origNew := newDriveActivityService
-	t.Cleanup(func() { newDriveActivityService = origNew })
-	newDriveActivityService = func(context.Context, string) (*driveactivity.Service, error) {
-		t.Fatalf("expected validation to fail before creating drive activity service")
-		return nil, context.Canceled
-	}
-
-	ctx := newCmdOutputContext(t, io.Discard, io.Discard)
+	ctx := withDriveActivityTestServiceFactory(
+		newCmdRuntimeOutputContext(t, io.Discard, io.Discard),
+		unexpectedDriveActivityTestService(t, "expected validation to fail before creating drive activity service"),
+	)
 	flags := &RootFlags{Account: "a@example.com"}
 
 	cases := []struct {

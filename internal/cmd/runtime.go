@@ -15,6 +15,8 @@ import (
 	"google.golang.org/api/cloudidentity/v1"
 	"google.golang.org/api/docs/v1"
 	"google.golang.org/api/drive/v3"
+	driveactivityapi "google.golang.org/api/driveactivity/v2"
+	drivelabelsapi "google.golang.org/api/drivelabels/v2"
 	formsapi "google.golang.org/api/forms/v1"
 	"google.golang.org/api/gmail/v1"
 	keepapi "google.golang.org/api/keep/v1"
@@ -53,6 +55,8 @@ func newDefaultRuntime() *app.Runtime {
 				return googleapi.NewHTTPClient(ctx, googleauth.ServiceDocs, account)
 			},
 			Drive:           googleapi.NewDrive,
+			DriveActivity:   googleapi.NewDriveActivity,
+			DriveLabels:     googleapi.NewDriveLabels,
 			Forms:           googleapi.NewForms,
 			Gmail:           googleapi.NewGmail,
 			Keep:            googleapi.NewKeepWithServiceAccount,
@@ -119,6 +123,12 @@ func normalizedRuntime(runtime *app.Runtime) *app.Runtime {
 	}
 	if normalized.Services.Drive == nil {
 		normalized.Services.Drive = defaults.Services.Drive
+	}
+	if normalized.Services.DriveActivity == nil {
+		normalized.Services.DriveActivity = defaults.Services.DriveActivity
+	}
+	if normalized.Services.DriveLabels == nil {
+		normalized.Services.DriveLabels = defaults.Services.DriveLabels
 	}
 	if normalized.Services.Docs == nil {
 		normalized.Services.Docs = defaults.Services.Docs
@@ -310,6 +320,20 @@ func driveService(ctx context.Context, account string) (*drive.Service, error) {
 		return runtime.Services.Drive(ctx, account)
 	}
 	return googleapi.NewDrive(ctx, account)
+}
+
+func driveActivityService(ctx context.Context, account string) (*driveactivityapi.Service, error) {
+	if runtime, ok := app.FromContext(ctx); ok && runtime.Services.DriveActivity != nil {
+		return runtime.Services.DriveActivity(ctx, account)
+	}
+	return googleapi.NewDriveActivity(ctx, account)
+}
+
+func driveLabelsService(ctx context.Context, account string) (*drivelabelsapi.Service, error) {
+	if runtime, ok := app.FromContext(ctx); ok && runtime.Services.DriveLabels != nil {
+		return runtime.Services.DriveLabels(ctx, account)
+	}
+	return googleapi.NewDriveLabels(ctx, account)
 }
 
 func docsService(ctx context.Context, account string) (*docs.Service, error) {

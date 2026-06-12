@@ -35,15 +35,13 @@ func TestDriveLabelsList_JSON(t *testing.T) {
 		})
 	}), drivelabels.NewService)
 	defer closeSvc()
-	orig := newDriveLabelsService
-	t.Cleanup(func() { newDriveLabelsService = orig })
-	newDriveLabelsService = func(context.Context, string) (*drivelabels.Service, error) { return svc, nil }
 
-	out := captureStdout(t, func() {
-		if err := (&DriveLabelsListCmd{Max: 50, PublishedOnly: true, View: "LABEL_VIEW_BASIC"}).Run(newCmdJSONContext(t), &RootFlags{Account: "a@example.com"}); err != nil {
-			t.Fatalf("Run: %v", err)
-		}
-	})
+	var stdout bytes.Buffer
+	ctx := withDriveLabelsTestService(newCmdRuntimeJSONOutputContext(t, &stdout, io.Discard), svc)
+	if err := (&DriveLabelsListCmd{Max: 50, PublishedOnly: true, View: "LABEL_VIEW_BASIC"}).Run(ctx, &RootFlags{Account: "a@example.com"}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	out := stdout.String()
 	var parsed struct {
 		LabelCount int `json:"labelCount"`
 		Labels     []struct {
@@ -59,14 +57,10 @@ func TestDriveLabelsList_JSON(t *testing.T) {
 }
 
 func TestDriveLabelsListInvalidMaxFailsBeforeService(t *testing.T) {
-	orig := newDriveLabelsService
-	t.Cleanup(func() { newDriveLabelsService = orig })
-	newDriveLabelsService = func(context.Context, string) (*drivelabels.Service, error) {
-		t.Fatalf("expected max validation to fail before creating drive labels service")
-		return nil, context.Canceled
-	}
-
-	ctx := newCmdOutputContext(t, io.Discard, io.Discard)
+	ctx := withDriveLabelsTestServiceFactory(
+		newCmdRuntimeOutputContext(t, io.Discard, io.Discard),
+		unexpectedDriveLabelsTestService(t, "expected max validation to fail before creating drive labels service"),
+	)
 	flags := &RootFlags{Account: "a@example.com"}
 
 	for _, args := range [][]string{{"--max", "0"}, {"--max=-1"}} {

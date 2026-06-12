@@ -37,12 +37,3 @@ func newGoogleTestServiceWithEndpoint[T any](
 	}
 	return svc
 }
-
-func stubGoogleTestService[T any](t *testing.T, target *func(context.Context, string) (*T, error), svc *T) {
-	t.Helper()
-
-	orig := *target
-	t.Cleanup(func() { *target = orig })
-	//nolint:unparam // test stub must match production service constructor signature.
-	*target = func(context.Context, string) (*T, error) { return svc, nil }
-}

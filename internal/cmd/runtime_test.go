@@ -15,6 +15,8 @@ import (
 	"google.golang.org/api/chat/v1"
 	"google.golang.org/api/cloudidentity/v1"
 	"google.golang.org/api/drive/v3"
+	driveactivityapi "google.golang.org/api/driveactivity/v2"
+	drivelabelsapi "google.golang.org/api/drivelabels/v2"
 	formsapi "google.golang.org/api/forms/v1"
 	"google.golang.org/api/gmail/v1"
 	keepapi "google.golang.org/api/keep/v1"
@@ -391,6 +393,56 @@ func TestDriveServiceUsesRuntimeFactory(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("driveService() = %p, want %p", got, want)
+	}
+	if gotAccount != "test@example.com" {
+		t.Fatalf("factory account = %q, want test@example.com", gotAccount)
+	}
+}
+
+func TestDriveActivityServiceUsesRuntimeFactory(t *testing.T) {
+	t.Parallel()
+
+	want := &driveactivityapi.Service{}
+	var gotAccount string
+	runtime := &app.Runtime{Services: app.Services{
+		DriveActivity: func(_ context.Context, account string) (*driveactivityapi.Service, error) {
+			gotAccount = account
+			return want, nil
+		},
+	}}
+	ctx := app.WithRuntime(context.Background(), runtime)
+
+	got, err := driveActivityService(ctx, "test@example.com")
+	if err != nil {
+		t.Fatalf("driveActivityService() error = %v", err)
+	}
+	if got != want {
+		t.Fatalf("driveActivityService() = %p, want %p", got, want)
+	}
+	if gotAccount != "test@example.com" {
+		t.Fatalf("factory account = %q, want test@example.com", gotAccount)
+	}
+}
+
+func TestDriveLabelsServiceUsesRuntimeFactory(t *testing.T) {
+	t.Parallel()
+
+	want := &drivelabelsapi.Service{}
+	var gotAccount string
+	runtime := &app.Runtime{Services: app.Services{
+		DriveLabels: func(_ context.Context, account string) (*drivelabelsapi.Service, error) {
+			gotAccount = account
+			return want, nil
+		},
+	}}
+	ctx := app.WithRuntime(context.Background(), runtime)
+
+	got, err := driveLabelsService(ctx, "test@example.com")
+	if err != nil {
+		t.Fatalf("driveLabelsService() error = %v", err)
+	}
+	if got != want {
+		t.Fatalf("driveLabelsService() = %p, want %p", got, want)
 	}
 	if gotAccount != "test@example.com" {
 		t.Fatalf("factory account = %q, want test@example.com", gotAccount)
