@@ -19,6 +19,7 @@ import (
 	"google.golang.org/api/gmail/v1"
 	keepapi "google.golang.org/api/keep/v1"
 	"google.golang.org/api/people/v1"
+	scriptapi "google.golang.org/api/script/v1"
 	searchconsoleapi "google.golang.org/api/searchconsole/v1"
 	"google.golang.org/api/sheets/v4"
 	"google.golang.org/api/slides/v1"
@@ -39,6 +40,7 @@ func newDefaultRuntime() *app.Runtime {
 		Services: app.Services{
 			AdminDirectory: googleapi.NewAdminDirectory,
 			AdminOrgUnit:   googleapi.NewAdminDirectoryOrgUnit,
+			AppScript:      googleapi.NewAppScript,
 			AnalyticsAdmin: googleapi.NewAnalyticsAdmin,
 			AnalyticsData:  googleapi.NewAnalyticsData,
 			Calendar:       googleapi.NewCalendar,
@@ -90,6 +92,9 @@ func normalizedRuntime(runtime *app.Runtime) *app.Runtime {
 	}
 	if normalized.Services.AdminOrgUnit == nil {
 		normalized.Services.AdminOrgUnit = defaults.Services.AdminOrgUnit
+	}
+	if normalized.Services.AppScript == nil {
+		normalized.Services.AppScript = defaults.Services.AppScript
 	}
 	if normalized.Services.AnalyticsAdmin == nil {
 		normalized.Services.AnalyticsAdmin = defaults.Services.AnalyticsAdmin
@@ -205,6 +210,13 @@ func adminOrgUnitDirectoryService(ctx context.Context, account string) (*admin.S
 		return runtime.Services.AdminOrgUnit(ctx, account)
 	}
 	return googleapi.NewAdminDirectoryOrgUnit(ctx, account)
+}
+
+func appScriptService(ctx context.Context, account string) (*scriptapi.Service, error) {
+	if runtime, ok := app.FromContext(ctx); ok && runtime.Services.AppScript != nil {
+		return runtime.Services.AppScript(ctx, account)
+	}
+	return googleapi.NewAppScript(ctx, account)
 }
 
 func analyticsAdminService(ctx context.Context, account string) (*analyticsadmin.Service, error) {

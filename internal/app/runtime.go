@@ -18,6 +18,7 @@ import (
 	"google.golang.org/api/gmail/v1"
 	"google.golang.org/api/keep/v1"
 	"google.golang.org/api/people/v1"
+	"google.golang.org/api/script/v1"
 	"google.golang.org/api/searchconsole/v1"
 	"google.golang.org/api/sheets/v4"
 	"google.golang.org/api/slides/v1"
@@ -35,6 +36,7 @@ type IO struct {
 
 type (
 	AdminDirectoryServiceFactory func(context.Context, string) (*admin.Service, error)
+	AppScriptServiceFactory      func(context.Context, string) (*script.Service, error)
 	AnalyticsAdminServiceFactory func(context.Context, string) (*analyticsadmin.Service, error)
 	AnalyticsDataServiceFactory  func(context.Context, string) (*analyticsdata.Service, error)
 	CalendarServiceFactory       func(context.Context, string) (*calendar.Service, error)
@@ -68,6 +70,7 @@ type ZoomMeetingClient interface {
 type Services struct {
 	AdminDirectory  AdminDirectoryServiceFactory
 	AdminOrgUnit    AdminDirectoryServiceFactory
+	AppScript       AppScriptServiceFactory
 	AnalyticsAdmin  AnalyticsAdminServiceFactory
 	AnalyticsData   AnalyticsDataServiceFactory
 	Calendar        CalendarServiceFactory

@@ -108,7 +108,7 @@ func buildAppScriptBackupSnapshot(ctx context.Context, flags *RootFlags, shardMa
 	if err != nil {
 		return backup.Snapshot{}, err
 	}
-	scriptSvc, err := newAppScriptService(ctx, account)
+	scriptSvc, err := appScriptService(ctx, account)
 	if err != nil {
 		return backup.Snapshot{}, err
 	}

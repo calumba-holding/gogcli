@@ -19,6 +19,7 @@ import (
 	"google.golang.org/api/gmail/v1"
 	keepapi "google.golang.org/api/keep/v1"
 	"google.golang.org/api/people/v1"
+	scriptapi "google.golang.org/api/script/v1"
 	searchconsoleapi "google.golang.org/api/searchconsole/v1"
 	"google.golang.org/api/sheets/v4"
 	"google.golang.org/api/slides/v1"
@@ -117,6 +118,31 @@ func TestAdminOrgUnitDirectoryServiceUsesRuntimeFactory(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("adminOrgUnitDirectoryService() = %p, want %p", got, want)
+	}
+	if gotAccount != "test@example.com" {
+		t.Fatalf("factory account = %q, want test@example.com", gotAccount)
+	}
+}
+
+func TestAppScriptServiceUsesRuntimeFactory(t *testing.T) {
+	t.Parallel()
+
+	want := &scriptapi.Service{}
+	var gotAccount string
+	runtime := &app.Runtime{Services: app.Services{
+		AppScript: func(_ context.Context, account string) (*scriptapi.Service, error) {
+			gotAccount = account
+			return want, nil
+		},
+	}}
+	ctx := app.WithRuntime(context.Background(), runtime)
+
+	got, err := appScriptService(ctx, "test@example.com")
+	if err != nil {
+		t.Fatalf("appScriptService() error = %v", err)
+	}
+	if got != want {
+		t.Fatalf("appScriptService() = %p, want %p", got, want)
 	}
 	if gotAccount != "test@example.com" {
 		t.Fatalf("factory account = %q, want test@example.com", gotAccount)

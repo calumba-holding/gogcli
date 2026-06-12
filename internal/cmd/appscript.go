@@ -3,17 +3,13 @@ package cmd
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"strings"
 
 	scriptapi "google.golang.org/api/script/v1"
 
-	"github.com/steipete/gogcli/internal/googleapi"
 	"github.com/steipete/gogcli/internal/outfmt"
 	"github.com/steipete/gogcli/internal/ui"
 )
-
-var newAppScriptService = googleapi.NewAppScript
 
 type AppScriptCmd struct {
 	Get     AppScriptGetCmd     `cmd:"" name:"get" aliases:"info,show" help:"Get Apps Script project metadata"`
@@ -36,7 +32,7 @@ func (c *AppScriptGetCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return usage("empty scriptId")
 	}
 
-	svc, err := newAppScriptService(ctx, account)
+	svc, err := appScriptService(ctx, account)
 	if err != nil {
 		return err
 	}
@@ -46,7 +42,7 @@ func (c *AppScriptGetCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), map[string]any{
 			"project":    project,
 			"editor_url": appScriptEditURL(scriptID),
 		})
@@ -84,7 +80,7 @@ func (c *AppScriptContentCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return usage("empty scriptId")
 	}
 
-	svc, err := newAppScriptService(ctx, account)
+	svc, err := appScriptService(ctx, account)
 	if err != nil {
 		return err
 	}
@@ -94,7 +90,7 @@ func (c *AppScriptContentCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), map[string]any{
 			"content": content,
 		})
 	}
@@ -137,7 +133,7 @@ func (c *AppScriptRunCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return err
 	}
 
-	svc, err := newAppScriptService(ctx, account)
+	svc, err := appScriptService(ctx, account)
 	if err != nil {
 		return err
 	}
@@ -151,7 +147,7 @@ func (c *AppScriptRunCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), map[string]any{
 			"operation": op,
 		})
 	}
@@ -212,7 +208,7 @@ func (c *AppScriptCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return err
 	}
 
-	svc, err := newAppScriptService(ctx, account)
+	svc, err := appScriptService(ctx, account)
 	if err != nil {
 		return err
 	}
@@ -225,7 +221,7 @@ func (c *AppScriptCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), map[string]any{
 			"created":    true,
 			"project":    project,
 			"editor_url": appScriptEditURL(project.ScriptId),
