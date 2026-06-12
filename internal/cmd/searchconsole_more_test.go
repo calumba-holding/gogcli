@@ -1,16 +1,13 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"google.golang.org/api/option"
-	searchconsoleapi "google.golang.org/api/searchconsole/v1"
+	"github.com/steipete/gogcli/internal/app"
 )
 
 func TestSearchConsoleQueryCmd_BuildRequest(t *testing.T) {
@@ -88,10 +85,7 @@ func TestSearchConsoleQueryCmd_BuildRequestFromJSON(t *testing.T) {
 }
 
 func TestExecute_SearchConsoleSitesGet_JSON(t *testing.T) {
-	origNew := newSearchConsoleService
-	t.Cleanup(func() { newSearchConsoleService = origNew })
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	svc := newSearchConsoleTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !(r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/webmasters/v3/sites/")) {
 			http.NotFound(w, r)
 			return
@@ -102,29 +96,14 @@ func TestExecute_SearchConsoleSitesGet_JSON(t *testing.T) {
 			"permissionLevel": "SITE_OWNER",
 		})
 	}))
-	defer srv.Close()
-
-	svc, err := searchconsoleapi.NewService(context.Background(),
-		option.WithoutAuthentication(),
-		option.WithHTTPClient(srv.Client()),
-		option.WithEndpoint(srv.URL+"/"),
-	)
-	if err != nil {
-		t.Fatalf("NewService: %v", err)
+	result := executeWithSearchConsoleTestService(t, []string{
+		"--json",
+		"--account", "a@b.com",
+		"searchconsole", "sites", "get", "sc-domain:example.com",
+	}, svc)
+	if result.err != nil {
+		t.Fatalf("Execute: %v", result.err)
 	}
-	newSearchConsoleService = func(context.Context, string) (*searchconsoleapi.Service, error) { return svc, nil }
-
-	out := captureStdout(t, func() {
-		_ = captureStderr(t, func() {
-			if err := Execute([]string{
-				"--json",
-				"--account", "a@b.com",
-				"searchconsole", "sites", "get", "sc-domain:example.com",
-			}); err != nil {
-				t.Fatalf("Execute: %v", err)
-			}
-		})
-	})
 
 	var parsed struct {
 		Site struct {
@@ -132,7 +111,7 @@ func TestExecute_SearchConsoleSitesGet_JSON(t *testing.T) {
 			PermissionLevel string `json:"permissionLevel"`
 		} `json:"site"`
 	}
-	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+	if err := json.Unmarshal([]byte(result.stdout), &parsed); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	if parsed.Site.SiteURL != "sc-domain:example.com" || parsed.Site.PermissionLevel != "SITE_OWNER" {
@@ -141,10 +120,7 @@ func TestExecute_SearchConsoleSitesGet_JSON(t *testing.T) {
 }
 
 func TestExecute_SearchConsoleSearchAnalyticsQuery_JSON(t *testing.T) {
-	origNew := newSearchConsoleService
-	t.Cleanup(func() { newSearchConsoleService = origNew })
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	svc := newSearchConsoleTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !(r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/searchAnalytics/query")) {
 			http.NotFound(w, r)
 			return
@@ -174,37 +150,22 @@ func TestExecute_SearchConsoleSearchAnalyticsQuery_JSON(t *testing.T) {
 			},
 		})
 	}))
-	defer srv.Close()
-
-	svc, err := searchconsoleapi.NewService(context.Background(),
-		option.WithoutAuthentication(),
-		option.WithHTTPClient(srv.Client()),
-		option.WithEndpoint(srv.URL+"/"),
-	)
-	if err != nil {
-		t.Fatalf("NewService: %v", err)
+	result := executeWithSearchConsoleTestService(t, []string{
+		"--json",
+		"--account", "a@b.com",
+		"searchconsole", "searchanalytics", "query", "sc-domain:example.com",
+		"--from", "2026-02-01",
+		"--to", "2026-02-07",
+		"--dimensions", "query,page",
+		"--type", "web",
+		"--aggregation", "by_page",
+		"--data-state", "final",
+		"--filter", "query:contains:gog",
+		"--max", "10",
+	}, svc)
+	if result.err != nil {
+		t.Fatalf("Execute: %v", result.err)
 	}
-	newSearchConsoleService = func(context.Context, string) (*searchconsoleapi.Service, error) { return svc, nil }
-
-	out := captureStdout(t, func() {
-		_ = captureStderr(t, func() {
-			if err := Execute([]string{
-				"--json",
-				"--account", "a@b.com",
-				"searchconsole", "searchanalytics", "query", "sc-domain:example.com",
-				"--from", "2026-02-01",
-				"--to", "2026-02-07",
-				"--dimensions", "query,page",
-				"--type", "web",
-				"--aggregation", "by_page",
-				"--data-state", "final",
-				"--filter", "query:contains:gog",
-				"--max", "10",
-			}); err != nil {
-				t.Fatalf("Execute: %v", err)
-			}
-		})
-	})
 
 	var parsed struct {
 		Type                    string `json:"type"`
@@ -213,7 +174,7 @@ func TestExecute_SearchConsoleSearchAnalyticsQuery_JSON(t *testing.T) {
 			Keys []string `json:"keys"`
 		} `json:"rows"`
 	}
-	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+	if err := json.Unmarshal([]byte(result.stdout), &parsed); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	if parsed.Type != "WEB" || parsed.ResponseAggregationType != "BY_PAGE" || len(parsed.Rows) != 1 {
@@ -222,10 +183,7 @@ func TestExecute_SearchConsoleSearchAnalyticsQuery_JSON(t *testing.T) {
 }
 
 func TestExecute_SearchConsoleSitemapsList_JSON(t *testing.T) {
-	origNew := newSearchConsoleService
-	t.Cleanup(func() { newSearchConsoleService = origNew })
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	svc := newSearchConsoleTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !(r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/sitemaps")) {
 			http.NotFound(w, r)
 			return
@@ -245,29 +203,14 @@ func TestExecute_SearchConsoleSitemapsList_JSON(t *testing.T) {
 			},
 		})
 	}))
-	defer srv.Close()
-
-	svc, err := searchconsoleapi.NewService(context.Background(),
-		option.WithoutAuthentication(),
-		option.WithHTTPClient(srv.Client()),
-		option.WithEndpoint(srv.URL+"/"),
-	)
-	if err != nil {
-		t.Fatalf("NewService: %v", err)
+	result := executeWithSearchConsoleTestService(t, []string{
+		"--json",
+		"--account", "a@b.com",
+		"searchconsole", "sitemaps", "sc-domain:example.com",
+	}, svc)
+	if result.err != nil {
+		t.Fatalf("Execute: %v", result.err)
 	}
-	newSearchConsoleService = func(context.Context, string) (*searchconsoleapi.Service, error) { return svc, nil }
-
-	out := captureStdout(t, func() {
-		_ = captureStderr(t, func() {
-			if err := Execute([]string{
-				"--json",
-				"--account", "a@b.com",
-				"searchconsole", "sitemaps", "sc-domain:example.com",
-			}); err != nil {
-				t.Fatalf("Execute: %v", err)
-			}
-		})
-	})
 
 	var parsed struct {
 		Sitemaps []struct {
@@ -275,7 +218,7 @@ func TestExecute_SearchConsoleSitemapsList_JSON(t *testing.T) {
 			Type string `json:"type"`
 		} `json:"sitemaps"`
 	}
-	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+	if err := json.Unmarshal([]byte(result.stdout), &parsed); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	if len(parsed.Sitemaps) != 1 || parsed.Sitemaps[0].Path != "https://example.com/sitemap.xml" || parsed.Sitemaps[0].Type != "SITEMAP" {
@@ -284,25 +227,22 @@ func TestExecute_SearchConsoleSitemapsList_JSON(t *testing.T) {
 }
 
 func TestExecute_SearchConsoleSitemapsSubmit_DryRun_JSON(t *testing.T) {
-	out := captureStdout(t, func() {
-		_ = captureStderr(t, func() {
-			if err := Execute([]string{
-				"--json",
-				"--dry-run",
-				"searchconsole", "sitemaps", "submit",
-				"sc-domain:example.com",
-				"https://example.com/sitemap.xml",
-			}); err != nil {
-				t.Fatalf("Execute: %v", err)
-			}
-		})
-	})
+	result := executeWithTestRuntime(t, []string{
+		"--json",
+		"--dry-run",
+		"searchconsole", "sitemaps", "submit",
+		"sc-domain:example.com",
+		"https://example.com/sitemap.xml",
+	}, &app.Runtime{})
+	if result.err != nil {
+		t.Fatalf("Execute: %v", result.err)
+	}
 
 	var parsed struct {
 		DryRun bool   `json:"dry_run"`
 		Op     string `json:"op"`
 	}
-	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+	if err := json.Unmarshal([]byte(result.stdout), &parsed); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	if !parsed.DryRun || parsed.Op != "searchconsole.sitemaps.submit" {
@@ -311,13 +251,6 @@ func TestExecute_SearchConsoleSitemapsSubmit_DryRun_JSON(t *testing.T) {
 }
 
 func TestExecute_SearchConsoleSitemaps_InvalidFeedPathIsUsageBeforeDryRun(t *testing.T) {
-	origNew := newSearchConsoleService
-	t.Cleanup(func() { newSearchConsoleService = origNew })
-	newSearchConsoleService = func(context.Context, string) (*searchconsoleapi.Service, error) {
-		t.Fatalf("expected validation to fail before creating search console service")
-		return nil, errors.New("unexpected search console service call")
-	}
-
 	testCases := [][]string{
 		{"--json", "--dry-run", "searchconsole", "sitemaps", "submit", "sc-domain:example.com", "nope"},
 		{"--json", "--dry-run", "searchconsole", "sitemaps", "delete", "sc-domain:example.com", "nope"},
@@ -325,13 +258,15 @@ func TestExecute_SearchConsoleSitemaps_InvalidFeedPathIsUsageBeforeDryRun(t *tes
 	}
 	for _, args := range testCases {
 		t.Run(strings.Join(args[3:], "_"), func(t *testing.T) {
-			_ = captureStderr(t, func() {
-				err := Execute(args)
-				var exitErr *ExitError
-				if !errors.As(err, &exitErr) || exitErr.Code != 2 || !strings.Contains(err.Error(), "invalid feedpath") {
-					t.Fatalf("unexpected err: %v", err)
-				}
-			})
+			result := executeWithSearchConsoleTestServiceFactory(
+				t,
+				args,
+				unexpectedSearchConsoleTestService(t, "expected validation to fail before creating search console service"),
+			)
+			var exitErr *ExitError
+			if !errors.As(result.err, &exitErr) || exitErr.Code != 2 || !strings.Contains(result.err.Error(), "invalid feedpath") {
+				t.Fatalf("unexpected err: %v", result.err)
+			}
 		})
 	}
 }
