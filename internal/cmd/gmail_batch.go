@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"os"
 
 	"google.golang.org/api/gmail/v1"
 
@@ -58,7 +57,7 @@ func (c *GmailBatchDeleteCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), map[string]any{
 			"deleted": ids,
 			"count":   len(ids),
 		})
@@ -126,7 +125,7 @@ func (c *GmailBatchModifyCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), map[string]any{
 			"modified":      ids,
 			"count":         len(ids),
 			"addedLabels":   addIDs,
