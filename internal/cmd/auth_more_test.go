@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/steipete/gogcli/internal/app"
 	"github.com/steipete/gogcli/internal/config"
 	"github.com/steipete/gogcli/internal/googleauth"
 )
@@ -47,17 +48,16 @@ func TestAuthKeepCmd_JSON(t *testing.T) {
 }
 
 func TestAuthManageCmd(t *testing.T) {
-	orig := startManageServer
-	t.Cleanup(func() { startManageServer = orig })
-
 	var captured googleauth.ManageServerOptions
-	startManageServer = func(_ context.Context, opts googleauth.ManageServerOptions) error {
-		captured = opts
-		return nil
-	}
+	ctx := withTestRuntime(context.Background(), func(runtime *app.Runtime) {
+		runtime.Auth.StartManageServer = func(_ context.Context, opts googleauth.ManageServerOptions) error {
+			captured = opts
+			return nil
+		}
+	})
 
 	cmd := AuthManageCmd{ServicesCSV: "gmail,calendar", ForceConsent: true}
-	if err := cmd.Run(context.Background(), &RootFlags{}); err != nil {
+	if err := cmd.Run(ctx, &RootFlags{}); err != nil {
 		t.Fatalf("AuthManageCmd: %v", err)
 	}
 	if !captured.ForceConsent || len(captured.Services) != 2 {

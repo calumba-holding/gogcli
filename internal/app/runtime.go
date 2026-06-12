@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"time"
 
 	admin "google.golang.org/api/admin/directory/v1"
 	analyticsadmin "google.golang.org/api/analyticsadmin/v1beta"
@@ -29,6 +30,8 @@ import (
 	"google.golang.org/api/youtube/v3"
 
 	"github.com/steipete/gogcli/internal/googleapi"
+	"github.com/steipete/gogcli/internal/googleauth"
+	"github.com/steipete/gogcli/internal/secrets"
 	"github.com/steipete/gogcli/internal/zoom"
 )
 
@@ -68,6 +71,13 @@ type (
 	DriveDownloadFunc            func(context.Context, *drive.Service, string) (*http.Response, error)
 	DriveExportFunc              func(context.Context, *drive.Service, string, string) (*http.Response, error)
 	OpenURLFunc                  func(context.Context, string) error
+	OpenSecretsStoreFunc         func() (secrets.Store, error)
+	AuthorizeGoogleFunc          func(context.Context, googleauth.AuthorizeOptions) (string, error)
+	StartManageServerFunc        func(context.Context, googleauth.ManageServerOptions) error
+	CheckRefreshTokenFunc        func(context.Context, string, string, []string, time.Duration) error
+	EnsureKeychainAccessFunc     func() error
+	FetchAuthorizedIdentityFunc  func(context.Context, string, string, []string, time.Duration) (googleauth.Identity, error)
+	ManualAuthURLFunc            func(context.Context, googleauth.AuthorizeOptions) (googleauth.ManualAuthURLResult, error)
 )
 
 type ZoomMeetingClient interface {
@@ -113,9 +123,20 @@ type Services struct {
 	OpenURL         OpenURLFunc
 }
 
+type AuthOperations struct {
+	OpenSecretsStore        OpenSecretsStoreFunc
+	AuthorizeGoogle         AuthorizeGoogleFunc
+	StartManageServer       StartManageServerFunc
+	CheckRefreshToken       CheckRefreshTokenFunc
+	EnsureKeychainAccess    EnsureKeychainAccessFunc
+	FetchAuthorizedIdentity FetchAuthorizedIdentityFunc
+	ManualAuthURL           ManualAuthURLFunc
+}
+
 type Runtime struct {
 	IO       IO
 	Services Services
+	Auth     AuthOperations
 }
 
 type runtimeContextKey struct{}

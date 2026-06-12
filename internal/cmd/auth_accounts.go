@@ -273,7 +273,7 @@ func (c *AuthManageCmd) Run(ctx context.Context, _ *RootFlags) error {
 		}
 	}
 
-	return startManageServer(ctx, googleauth.ManageServerOptions{
+	return startAuthManageServer(ctx, googleauth.ManageServerOptions{
 		Timeout:      c.Timeout,
 		Services:     services,
 		ForceConsent: c.ForceConsent,

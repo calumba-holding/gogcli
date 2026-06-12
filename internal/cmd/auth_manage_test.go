@@ -6,20 +6,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/steipete/gogcli/internal/app"
 	"github.com/steipete/gogcli/internal/googleauth"
 )
 
 func TestAuthManageCmd_ServicesAndOptions(t *testing.T) {
-	orig := startManageServer
-	t.Cleanup(func() { startManageServer = orig })
-
 	var got googleauth.ManageServerOptions
-	startManageServer = func(ctx context.Context, opts googleauth.ManageServerOptions) error {
-		got = opts
-		return nil
-	}
+	ctx := withTestRuntime(context.Background(), func(runtime *app.Runtime) {
+		runtime.Auth.StartManageServer = func(ctx context.Context, opts googleauth.ManageServerOptions) error {
+			got = opts
+			return nil
+		}
+	})
 
-	if err := runKong(t, &AuthManageCmd{}, []string{"--services", "gmail,drive,gmail", "--force-consent", "--timeout", "2m", "--listen-addr", "0.0.0.0:8080", "--redirect-host", "gog.example.com"}, context.Background(), nil); err != nil {
+	if err := runKong(t, &AuthManageCmd{}, []string{"--services", "gmail,drive,gmail", "--force-consent", "--timeout", "2m", "--listen-addr", "0.0.0.0:8080", "--redirect-host", "gog.example.com"}, ctx, nil); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 
@@ -41,11 +41,11 @@ func TestAuthManageCmd_ServicesAndOptions(t *testing.T) {
 }
 
 func TestAuthManageCmd_InvalidService(t *testing.T) {
-	orig := startManageServer
-	t.Cleanup(func() { startManageServer = orig })
-	startManageServer = func(context.Context, googleauth.ManageServerOptions) error { return nil }
+	ctx := withTestRuntime(context.Background(), func(runtime *app.Runtime) {
+		runtime.Auth.StartManageServer = func(context.Context, googleauth.ManageServerOptions) error { return nil }
+	})
 
-	if err := runKong(t, &AuthManageCmd{}, []string{"--services", "nope"}, context.Background(), nil); err == nil {
+	if err := runKong(t, &AuthManageCmd{}, []string{"--services", "nope"}, ctx, nil); err == nil {
 		t.Fatalf("expected error")
 	} else {
 		var exitErr *ExitError
@@ -56,16 +56,15 @@ func TestAuthManageCmd_InvalidService(t *testing.T) {
 }
 
 func TestAuthManageCmd_DefaultServices_UserPreset(t *testing.T) {
-	orig := startManageServer
-	t.Cleanup(func() { startManageServer = orig })
-
 	var got googleauth.ManageServerOptions
-	startManageServer = func(ctx context.Context, opts googleauth.ManageServerOptions) error {
-		got = opts
-		return nil
-	}
+	ctx := withTestRuntime(context.Background(), func(runtime *app.Runtime) {
+		runtime.Auth.StartManageServer = func(ctx context.Context, opts googleauth.ManageServerOptions) error {
+			got = opts
+			return nil
+		}
+	})
 
-	if err := runKong(t, &AuthManageCmd{}, nil, context.Background(), nil); err != nil {
+	if err := runKong(t, &AuthManageCmd{}, nil, ctx, nil); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 
@@ -80,11 +79,11 @@ func TestAuthManageCmd_DefaultServices_UserPreset(t *testing.T) {
 }
 
 func TestAuthManageCmd_KeepRejected(t *testing.T) {
-	orig := startManageServer
-	t.Cleanup(func() { startManageServer = orig })
-	startManageServer = func(context.Context, googleauth.ManageServerOptions) error { return nil }
+	ctx := withTestRuntime(context.Background(), func(runtime *app.Runtime) {
+		runtime.Auth.StartManageServer = func(context.Context, googleauth.ManageServerOptions) error { return nil }
+	})
 
-	if err := runKong(t, &AuthManageCmd{}, []string{"--services", "keep"}, context.Background(), nil); err == nil {
+	if err := runKong(t, &AuthManageCmd{}, []string{"--services", "keep"}, ctx, nil); err == nil {
 		t.Fatalf("expected error")
 	}
 }

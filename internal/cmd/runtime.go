@@ -31,6 +31,7 @@ import (
 	"github.com/steipete/gogcli/internal/app"
 	"github.com/steipete/gogcli/internal/googleapi"
 	"github.com/steipete/gogcli/internal/googleauth"
+	"github.com/steipete/gogcli/internal/secrets"
 	"github.com/steipete/gogcli/internal/termutil"
 )
 
@@ -79,6 +80,15 @@ func newDefaultRuntime() *app.Runtime {
 			DriveDownload:   driveDownload,
 			DriveExport:     driveExportDownload,
 			OpenURL:         openPhotosPickerBrowser,
+		},
+		Auth: app.AuthOperations{
+			OpenSecretsStore:        secrets.OpenDefault,
+			AuthorizeGoogle:         googleauth.Authorize,
+			StartManageServer:       googleauth.StartManageServer,
+			CheckRefreshToken:       googleauth.CheckRefreshToken,
+			EnsureKeychainAccess:    secrets.EnsureKeychainAccess,
+			FetchAuthorizedIdentity: googleauth.IdentityForRefreshToken,
+			ManualAuthURL:           googleauth.ManualAuthURL,
 		},
 	}
 }
@@ -203,6 +213,27 @@ func normalizedRuntime(runtime *app.Runtime) *app.Runtime {
 	if normalized.Services.OpenURL == nil {
 		normalized.Services.OpenURL = defaults.Services.OpenURL
 	}
+	if normalized.Auth.OpenSecretsStore == nil {
+		normalized.Auth.OpenSecretsStore = defaults.Auth.OpenSecretsStore
+	}
+	if normalized.Auth.AuthorizeGoogle == nil {
+		normalized.Auth.AuthorizeGoogle = defaults.Auth.AuthorizeGoogle
+	}
+	if normalized.Auth.StartManageServer == nil {
+		normalized.Auth.StartManageServer = defaults.Auth.StartManageServer
+	}
+	if normalized.Auth.CheckRefreshToken == nil {
+		normalized.Auth.CheckRefreshToken = defaults.Auth.CheckRefreshToken
+	}
+	if normalized.Auth.EnsureKeychainAccess == nil {
+		normalized.Auth.EnsureKeychainAccess = defaults.Auth.EnsureKeychainAccess
+	}
+	if normalized.Auth.FetchAuthorizedIdentity == nil {
+		normalized.Auth.FetchAuthorizedIdentity = defaults.Auth.FetchAuthorizedIdentity
+	}
+	if normalized.Auth.ManualAuthURL == nil {
+		normalized.Auth.ManualAuthURL = defaults.Auth.ManualAuthURL
+	}
 	return &normalized
 }
 
@@ -237,6 +268,13 @@ func stdinReader(ctx context.Context) io.Reader {
 func stdinIsTerminal(ctx context.Context) bool {
 	file, ok := stdinReader(ctx).(*os.File)
 	return ok && termutil.IsTerminal(file)
+}
+
+func startAuthManageServer(ctx context.Context, options googleauth.ManageServerOptions) error {
+	if runtime, ok := app.FromContext(ctx); ok && runtime.Auth.StartManageServer != nil {
+		return runtime.Auth.StartManageServer(ctx, options)
+	}
+	return googleauth.StartManageServer(ctx, options)
 }
 
 func adminDirectoryService(ctx context.Context, account string) (*admin.Service, error) {
