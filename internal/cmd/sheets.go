@@ -760,7 +760,7 @@ func (c *SheetsCreateCmd) Run(ctx context.Context, flags *RootFlags) error {
 				payload["moveError"] = moveError
 			}
 		}
-		return outfmt.WriteJSON(ctx, os.Stdout, payload)
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), payload)
 	}
 
 	u.Out().Linef("Created spreadsheet: %s", resp.Properties.Title)
