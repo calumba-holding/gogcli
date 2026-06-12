@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -79,8 +80,7 @@ func TestDocsCellStyleBuildsTableAndTextRequests(t *testing.T) {
 }
 
 func TestDocsCellStyle_TableSelectionErrorsAreUsage(t *testing.T) {
-	origDocs := newDocsService
-	t.Cleanup(func() { newDocsService = origDocs })
+	t.Parallel()
 
 	docSvc, cleanup := newDocsServiceForTest(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -92,10 +92,10 @@ func TestDocsCellStyle_TableSelectionErrorsAreUsage(t *testing.T) {
 		}
 	}))
 	defer cleanup()
-	newDocsService = func(context.Context, string) (*docs.Service, error) { return docSvc, nil }
 
 	cmd := &DocsCellStyleCmd{}
-	err := runKong(t, cmd, []string{"doc1", "--row", "0", "--col", "0", "--background-color", "#fff"}, newDocsCmdContext(t), &RootFlags{Account: "a@b.com"})
+	ctx := withDocsTestService(newCmdRuntimeOutputContext(t, io.Discard, io.Discard), docSvc)
+	err := runKong(t, cmd, []string{"doc1", "--row", "0", "--col", "0", "--background-color", "#fff"}, ctx, &RootFlags{Account: "a@b.com"})
 	if err == nil || !strings.Contains(err.Error(), "document has no tables") {
 		t.Fatalf("expected no-tables error, got %v", err)
 	}
