@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"google.golang.org/api/gmail/v1"
@@ -121,7 +120,7 @@ func (c *GmailDraftsGetCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 	if draft.Message == nil {
 		if outfmt.IsJSON(ctx) {
-			return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{"draft": draft})
+			return outfmt.WriteJSON(ctx, stdoutWriter(ctx), map[string]any{"draft": draft})
 		}
 		u.Err().Println("Empty draft")
 		return nil
@@ -141,7 +140,7 @@ func (c *GmailDraftsGetCmd) Run(ctx context.Context, flags *RootFlags) error {
 			}
 			out["downloaded"] = attachmentDownloadDraftOutputs(downloads)
 		}
-		return outfmt.WriteJSON(ctx, os.Stdout, out)
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), out)
 	}
 
 	u.Out().Linef("Draft-ID: %s", draft.Id)
@@ -423,7 +422,7 @@ func writeDraftResult(ctx context.Context, u *ui.UI, draft *gmail.Draft, threadI
 		if len(attachments) > 0 {
 			result["attachments"] = attachments
 		}
-		return outfmt.WriteJSON(ctx, os.Stdout, result)
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), result)
 	}
 	u.Out().Linef("draft_id\t%s", draft.Id)
 	if draft.Message != nil && draft.Message.Id != "" {

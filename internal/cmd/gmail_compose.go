@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"os"
 	"strings"
 
 	"google.golang.org/api/gmail/v1"
@@ -204,14 +203,14 @@ func buildGmailMessage(opts sendMessageOptions, batch sendBatch, cfg *rfc822Conf
 func writeGmailMessageResults(ctx context.Context, u *ui.UI, results []gmailMessageResult) error {
 	if outfmt.IsJSON(ctx) {
 		if len(results) == 1 {
-			return outfmt.WriteJSON(ctx, os.Stdout, gmailMessageResultJSON(results[0], false))
+			return outfmt.WriteJSON(ctx, stdoutWriter(ctx), gmailMessageResultJSON(results[0], false))
 		}
 
 		items := make([]map[string]any, 0, len(results))
 		for _, r := range results {
 			items = append(items, gmailMessageResultJSON(r, true))
 		}
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{"messages": items})
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), map[string]any{"messages": items})
 	}
 
 	for i, r := range results {
