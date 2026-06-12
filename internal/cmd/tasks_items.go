@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/alecthomas/kong"
 	"google.golang.org/api/tasks/v1"
@@ -192,159 +191,26 @@ type TasksAddCmd struct {
 	RepeatUntil string `name:"repeat-until" help:"Repeat until date/time (RFC3339 or YYYY-MM-DD; requires --repeat, --recur, or --recur-rrule)"`
 }
 
-type tasksAddRepeatConfig struct {
-	Unit      repeatUnit
-	Interval  int
-	Repeat    string
-	Recur     string
-	RecurRule string
-	Until     string
-}
-
-type tasksAddDatePlan struct {
-	DueTime    time.Time
-	DueHasTime bool
-	DueValue   string
-	Until      *time.Time
-}
-
-func resolveTasksAddRepeatConfig(c *TasksAddCmd, due string) (tasksAddRepeatConfig, error) {
-	config := tasksAddRepeatConfig{
-		Interval:  1,
-		Repeat:    strings.TrimSpace(c.Repeat),
-		Recur:     strings.TrimSpace(c.Recur),
-		RecurRule: strings.TrimSpace(c.RecurRRule),
-		Until:     strings.TrimSpace(c.RepeatUntil),
-	}
-
-	if config.Repeat != "" && (config.Recur != "" || config.RecurRule != "") {
-		return tasksAddRepeatConfig{}, usage("--repeat cannot be combined with --recur or --recur-rrule")
-	}
-	if config.Recur != "" && config.RecurRule != "" {
-		return tasksAddRepeatConfig{}, usage("--recur and --recur-rrule are mutually exclusive")
-	}
-
-	var err error
-	switch {
-	case config.RecurRule != "":
-		config.Unit, config.Interval, err = parseRepeatRRule(config.RecurRule)
-	case config.Recur != "":
-		config.Unit, err = parseRepeatUnit(config.Recur)
-	default:
-		config.Unit, err = parseRepeatUnit(config.Repeat)
-	}
-	if err != nil {
-		return tasksAddRepeatConfig{}, newUsageError(err)
-	}
-
-	if config.Unit == repeatNone && (config.Until != "" || c.RepeatCount != 0) {
-		return tasksAddRepeatConfig{}, usage("--repeat, --recur, or --recur-rrule is required when using --repeat-count or --repeat-until")
-	}
-
-	if config.Unit != repeatNone {
-		if due == "" {
-			return tasksAddRepeatConfig{}, usage("--due is required when using --repeat, --recur, or --recur-rrule")
-		}
-		if c.RepeatCount < 0 {
-			return tasksAddRepeatConfig{}, usage("--repeat-count must be >= 0")
-		}
-		if config.Until == "" && c.RepeatCount == 0 {
-			if config.Recur != "" || config.RecurRule != "" {
-				return tasksAddRepeatConfig{}, usage("Google Tasks API does not support server-side recurring metadata; use --repeat-count or --repeat-until with --recur/--recur-rrule to materialize occurrences")
-			}
-			return tasksAddRepeatConfig{}, usage("--repeat requires --repeat-count or --repeat-until")
-		}
-	}
-
-	return config, nil
-}
-
-func prepareTasksAddDatePlan(due string, repeatConfig tasksAddRepeatConfig) (tasksAddDatePlan, error) {
-	plan := tasksAddDatePlan{}
-	due = strings.TrimSpace(due)
-	if due == "" {
-		return plan, nil
-	}
-
-	dueTime, dueHasTime, err := parseTaskDate(due)
-	if err != nil {
-		return tasksAddDatePlan{}, newUsageError(err)
-	}
-	plan.DueTime = dueTime
-	plan.DueHasTime = dueHasTime
-	plan.DueValue = formatTaskDue(dueTime, dueHasTime)
-
-	if repeatConfig.Unit == repeatNone {
-		return plan, nil
-	}
-
-	if repeatConfig.Until != "" {
-		untilValue, untilHasTime, parseErr := parseTaskDate(repeatConfig.Until)
-		if parseErr != nil {
-			return tasksAddDatePlan{}, newUsageError(parseErr)
-		}
-		switch {
-		case dueHasTime && !untilHasTime:
-			untilValue = time.Date(
-				untilValue.Year(),
-				untilValue.Month(),
-				untilValue.Day(),
-				dueTime.Hour(),
-				dueTime.Minute(),
-				dueTime.Second(),
-				dueTime.Nanosecond(),
-				dueTime.Location(),
-			)
-		case !dueHasTime && untilHasTime:
-			untilValue = time.Date(untilValue.Year(), untilValue.Month(), untilValue.Day(), 0, 0, 0, 0, time.UTC)
-		}
-		plan.Until = &untilValue
-	}
-
-	if plan.Until != nil && dueTime.After(*plan.Until) {
-		return tasksAddDatePlan{}, usage("repeat produced no occurrences")
-	}
-
-	return plan, nil
-}
-
 func (c *TasksAddCmd) Run(ctx context.Context, flags *RootFlags) error {
 	u := ui.FromContext(ctx)
-	tasklistID := strings.TrimSpace(c.TasklistID)
-	if tasklistID == "" {
-		return usage("empty tasklistId")
-	}
-	title := strings.TrimSpace(c.Title)
-	if title == "" {
-		return usage("required: --title")
-	}
-	notes := strings.TrimSpace(c.Notes)
-	due := strings.TrimSpace(c.Due)
-	parent := strings.TrimSpace(c.Parent)
-	previous := strings.TrimSpace(c.Previous)
-	repeatConfig, err := resolveTasksAddRepeatConfig(c, due)
-	if err != nil {
-		return err
-	}
-	datePlan, err := prepareTasksAddDatePlan(due, repeatConfig)
+	plan, err := newTasksAddPlan(tasksAddInput{
+		TasklistID:  c.TasklistID,
+		Title:       c.Title,
+		Notes:       c.Notes,
+		Due:         c.Due,
+		Parent:      c.Parent,
+		Previous:    c.Previous,
+		Repeat:      c.Repeat,
+		Recur:       c.Recur,
+		RecurRRule:  c.RecurRRule,
+		RepeatCount: c.RepeatCount,
+		RepeatUntil: c.RepeatUntil,
+	})
 	if err != nil {
 		return err
 	}
 
-	if dryRunErr := dryRunExit(ctx, flags, "tasks.add", map[string]any{
-		"tasklist_id":  tasklistID,
-		"title":        title,
-		"notes":        notes,
-		"due":          due,
-		"parent":       parent,
-		"previous":     previous,
-		"repeat":       repeatConfig.Repeat,
-		"recur":        repeatConfig.Recur,
-		"recur_rrule":  repeatConfig.RecurRule,
-		"repeat_step":  repeatConfig.Interval,
-		"repeat_count": c.RepeatCount,
-		"repeat_until": repeatConfig.Until,
-	}); dryRunErr != nil {
+	if dryRunErr := dryRunExit(ctx, flags, "tasks.add", plan.dryRunPayload()); dryRunErr != nil {
 		return dryRunErr
 	}
 
@@ -353,29 +219,29 @@ func (c *TasksAddCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return err
 	}
 
-	if repeatConfig.Unit == repeatNone {
+	if !plan.repeating() {
 		svc, svcErr := tasksService(ctx, account)
 		if svcErr != nil {
 			return svcErr
 		}
-		tasklistID, err = resolveTasklistID(ctx, svc, tasklistID)
+		plan.TasklistID, err = resolveTasklistID(ctx, svc, plan.TasklistID)
 		if err != nil {
 			return err
 		}
 		if !outfmt.IsJSON(ctx) {
-			warnTasksDueTime(u, due)
+			warnTasksDueTime(u, plan.Due)
 		}
 		task := &tasks.Task{
-			Title: title,
-			Notes: notes,
-			Due:   datePlan.DueValue,
+			Title: plan.Title,
+			Notes: plan.Notes,
+			Due:   plan.Date.DueValue,
 		}
-		call := svc.Tasks.Insert(tasklistID, task)
-		if parent != "" {
-			call = call.Parent(parent)
+		call := svc.Tasks.Insert(plan.TasklistID, task)
+		if plan.Parent != "" {
+			call = call.Parent(plan.Parent)
 		}
-		if previous != "" {
-			call = call.Previous(previous)
+		if plan.Previous != "" {
+			call = call.Previous(plan.Previous)
 		}
 
 		created, createErr := call.Do()
@@ -400,50 +266,49 @@ func (c *TasksAddCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	if !outfmt.IsJSON(ctx) {
-		warnTasksDueTime(u, due)
+		warnTasksDueTime(u, plan.Due)
 	}
 
-	schedule := expandRepeatSchedule(datePlan.DueTime, repeatConfig.Unit, repeatConfig.Interval, c.RepeatCount, datePlan.Until)
-	if len(schedule) == 0 {
-		return usage("repeat produced no occurrences")
+	schedule, err := plan.repeatSchedule()
+	if err != nil {
+		return err
 	}
 
 	svc, svcErr := tasksService(ctx, account)
 	if svcErr != nil {
 		return svcErr
 	}
-	tasklistID, err = resolveTasklistID(ctx, svc, tasklistID)
+	plan.TasklistID, err = resolveTasklistID(ctx, svc, plan.TasklistID)
 	if err != nil {
 		return err
 	}
 
-	baseTitle := title
 	createdTasks := make([]*tasks.Task, 0, len(schedule))
 
 	for i, due := range schedule {
-		title := baseTitle
+		title := plan.Title
 		if len(schedule) > 1 {
-			title = fmt.Sprintf("%s (#%d/%d)", baseTitle, i+1, len(schedule))
+			title = fmt.Sprintf("%s (#%d/%d)", plan.Title, i+1, len(schedule))
 		}
 		task := &tasks.Task{
 			Title: title,
-			Notes: notes,
-			Due:   formatTaskDue(due, datePlan.DueHasTime),
+			Notes: plan.Notes,
+			Due:   formatTaskDue(due, plan.Date.DueHasTime),
 		}
-		call := svc.Tasks.Insert(tasklistID, task)
-		if parent != "" {
-			call = call.Parent(parent)
+		call := svc.Tasks.Insert(plan.TasklistID, task)
+		if plan.Parent != "" {
+			call = call.Parent(plan.Parent)
 		}
-		if previous != "" {
-			call = call.Previous(previous)
+		if plan.Previous != "" {
+			call = call.Previous(plan.Previous)
 		}
 		created, createErr := call.Do()
 		if createErr != nil {
 			return createErr
 		}
 		createdTasks = append(createdTasks, created)
-		if previous != "" {
-			previous = created.Id
+		if plan.Previous != "" {
+			plan.Previous = created.Id
 		}
 	}
 
