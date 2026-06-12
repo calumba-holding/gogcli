@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -9,12 +10,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"google.golang.org/api/option"
-	"google.golang.org/api/sheets/v4"
-
-	"github.com/steipete/gogcli/internal/outfmt"
-	"github.com/steipete/gogcli/internal/ui"
 )
 
 type updateNoteRecorder struct {
@@ -127,37 +122,29 @@ func expectRepeatCellRequest(t *testing.T, recorder *updateNoteRecorder, note st
 	}
 }
 
-func TestSheetsUpdateNoteCmd_SingleCell_JSON(t *testing.T) {
-	origNew := newSheetsService
-	t.Cleanup(func() { newSheetsService = origNew })
-
-	recorder := &updateNoteRecorder{}
+func newSheetsUpdateNoteTestContext(t *testing.T, recorder *updateNoteRecorder, jsonOutput bool) (context.Context, *bytes.Buffer) {
+	t.Helper()
 	srv := httptest.NewServer(updateNoteHandler(recorder))
-	defer srv.Close()
-
-	svc, err := sheets.NewService(context.Background(),
-		option.WithoutAuthentication(),
-		option.WithHTTPClient(srv.Client()),
-		option.WithEndpoint(srv.URL+"/"),
-	)
-	if err != nil {
-		t.Fatalf("NewService: %v", err)
+	t.Cleanup(srv.Close)
+	svc := newSheetsServiceFromServer(t, srv)
+	output := &bytes.Buffer{}
+	var ctx context.Context
+	if jsonOutput {
+		ctx = newCmdRuntimeJSONOutputContext(t, output, io.Discard)
+	} else {
+		ctx = newCmdRuntimeOutputContext(t, output, io.Discard)
 	}
-	newSheetsService = func(context.Context, string) (*sheets.Service, error) { return svc, nil }
+	return withSheetsTestService(ctx, svc), output
+}
 
+func TestSheetsUpdateNoteCmd_SingleCell_JSON(t *testing.T) {
+	recorder := &updateNoteRecorder{}
+	ctx, output := newSheetsUpdateNoteTestContext(t, recorder, true)
 	flags := &RootFlags{Account: "a@b.com"}
-	u, uiErr := ui.New(ui.Options{Stdout: io.Discard, Stderr: io.Discard, Color: "never"})
-	if uiErr != nil {
-		t.Fatalf("ui.New: %v", uiErr)
+	if err := runKong(t, &SheetsUpdateNoteCmd{}, []string{"s1", "Sheet1!A1", "--note", "Hello world"}, ctx, flags); err != nil {
+		t.Fatalf("set-note: %v", err)
 	}
-	ctx := ui.WithUI(context.Background(), u)
-	ctx = outfmt.WithMode(ctx, outfmt.Mode{JSON: true})
-
-	out := captureStdout(t, func() {
-		if err := runKong(t, &SheetsUpdateNoteCmd{}, []string{"s1", "Sheet1!A1", "--note", "Hello world"}, ctx, flags); err != nil {
-			t.Fatalf("set-note: %v", err)
-		}
-	})
+	out := output.String()
 
 	var result map[string]any
 	if err := json.Unmarshal([]byte(out), &result); err != nil {
@@ -175,36 +162,13 @@ func TestSheetsUpdateNoteCmd_SingleCell_JSON(t *testing.T) {
 }
 
 func TestSheetsUpdateNoteCmd_Range_JSON(t *testing.T) {
-	origNew := newSheetsService
-	t.Cleanup(func() { newSheetsService = origNew })
-
 	recorder := &updateNoteRecorder{}
-	srv := httptest.NewServer(updateNoteHandler(recorder))
-	defer srv.Close()
-
-	svc, err := sheets.NewService(context.Background(),
-		option.WithoutAuthentication(),
-		option.WithHTTPClient(srv.Client()),
-		option.WithEndpoint(srv.URL+"/"),
-	)
-	if err != nil {
-		t.Fatalf("NewService: %v", err)
-	}
-	newSheetsService = func(context.Context, string) (*sheets.Service, error) { return svc, nil }
-
+	ctx, output := newSheetsUpdateNoteTestContext(t, recorder, true)
 	flags := &RootFlags{Account: "a@b.com"}
-	u, uiErr := ui.New(ui.Options{Stdout: io.Discard, Stderr: io.Discard, Color: "never"})
-	if uiErr != nil {
-		t.Fatalf("ui.New: %v", uiErr)
+	if err := runKong(t, &SheetsUpdateNoteCmd{}, []string{"s1", "Sheet1!A1:B2", "--note", "Same note"}, ctx, flags); err != nil {
+		t.Fatalf("set-note: %v", err)
 	}
-	ctx := ui.WithUI(context.Background(), u)
-	ctx = outfmt.WithMode(ctx, outfmt.Mode{JSON: true})
-
-	out := captureStdout(t, func() {
-		if err := runKong(t, &SheetsUpdateNoteCmd{}, []string{"s1", "Sheet1!A1:B2", "--note", "Same note"}, ctx, flags); err != nil {
-			t.Fatalf("set-note: %v", err)
-		}
-	})
+	out := output.String()
 
 	var result map[string]any
 	if err := json.Unmarshal([]byte(out), &result); err != nil {
@@ -219,36 +183,13 @@ func TestSheetsUpdateNoteCmd_Range_JSON(t *testing.T) {
 }
 
 func TestSheetsUpdateNoteCmd_ClearNote_Text(t *testing.T) {
-	origNew := newSheetsService
-	t.Cleanup(func() { newSheetsService = origNew })
-
 	recorder := &updateNoteRecorder{}
-	srv := httptest.NewServer(updateNoteHandler(recorder))
-	defer srv.Close()
-
-	svc, err := sheets.NewService(context.Background(),
-		option.WithoutAuthentication(),
-		option.WithHTTPClient(srv.Client()),
-		option.WithEndpoint(srv.URL+"/"),
-	)
-	if err != nil {
-		t.Fatalf("NewService: %v", err)
-	}
-	newSheetsService = func(context.Context, string) (*sheets.Service, error) { return svc, nil }
-
+	ctx, output := newSheetsUpdateNoteTestContext(t, recorder, false)
 	flags := &RootFlags{Account: "a@b.com"}
-
-	out := captureStdout(t, func() {
-		u, uiErr := ui.New(ui.Options{Stdout: os.Stdout, Stderr: io.Discard, Color: "never"})
-		if uiErr != nil {
-			t.Fatalf("ui.New: %v", uiErr)
-		}
-		ctx := ui.WithUI(context.Background(), u)
-
-		if err := runKong(t, &SheetsUpdateNoteCmd{}, []string{"s1", "Sheet1!A1", "--note", ""}, ctx, flags); err != nil {
-			t.Fatalf("set-note: %v", err)
-		}
-	})
+	if err := runKong(t, &SheetsUpdateNoteCmd{}, []string{"s1", "Sheet1!A1", "--note", ""}, ctx, flags); err != nil {
+		t.Fatalf("set-note: %v", err)
+	}
+	out := output.String()
 
 	if !strings.Contains(out, "Cleared note") {
 		t.Errorf("expected 'Cleared note' in output: %q", out)
@@ -258,22 +199,8 @@ func TestSheetsUpdateNoteCmd_ClearNote_Text(t *testing.T) {
 }
 
 func TestSheetsUpdateNoteCmd_NoteFile(t *testing.T) {
-	origNew := newSheetsService
-	t.Cleanup(func() { newSheetsService = origNew })
-
 	recorder := &updateNoteRecorder{}
-	srv := httptest.NewServer(updateNoteHandler(recorder))
-	defer srv.Close()
-
-	svc, err := sheets.NewService(context.Background(),
-		option.WithoutAuthentication(),
-		option.WithHTTPClient(srv.Client()),
-		option.WithEndpoint(srv.URL+"/"),
-	)
-	if err != nil {
-		t.Fatalf("NewService: %v", err)
-	}
-	newSheetsService = func(context.Context, string) (*sheets.Service, error) { return svc, nil }
+	ctx, output := newSheetsUpdateNoteTestContext(t, recorder, true)
 
 	// Create temp file with note content.
 	tmpFile, err := os.CreateTemp(t.TempDir(), "note-*.txt")
@@ -287,18 +214,10 @@ func TestSheetsUpdateNoteCmd_NoteFile(t *testing.T) {
 	tmpFile.Close()
 
 	flags := &RootFlags{Account: "a@b.com"}
-	u, uiErr := ui.New(ui.Options{Stdout: io.Discard, Stderr: io.Discard, Color: "never"})
-	if uiErr != nil {
-		t.Fatalf("ui.New: %v", uiErr)
+	if err := runKong(t, &SheetsUpdateNoteCmd{}, []string{"s1", "Sheet1!A1", "--note-file", tmpFile.Name()}, ctx, flags); err != nil {
+		t.Fatalf("set-note: %v", err)
 	}
-	ctx := ui.WithUI(context.Background(), u)
-	ctx = outfmt.WithMode(ctx, outfmt.Mode{JSON: true})
-
-	out := captureStdout(t, func() {
-		if err := runKong(t, &SheetsUpdateNoteCmd{}, []string{"s1", "Sheet1!A1", "--note-file", tmpFile.Name()}, ctx, flags); err != nil {
-			t.Fatalf("set-note: %v", err)
-		}
-	})
+	out := output.String()
 
 	var result map[string]any
 	if err := json.Unmarshal([]byte(out), &result); err != nil {
@@ -314,11 +233,7 @@ func TestSheetsUpdateNoteCmd_NoteFile(t *testing.T) {
 
 func TestSheetsUpdateNoteCmd_MissingNote(t *testing.T) {
 	flags := &RootFlags{Account: "a@b.com"}
-	u, uiErr := ui.New(ui.Options{Stdout: io.Discard, Stderr: io.Discard, Color: "never"})
-	if uiErr != nil {
-		t.Fatalf("ui.New: %v", uiErr)
-	}
-	ctx := ui.WithUI(context.Background(), u)
+	ctx := newCmdRuntimeOutputContext(t, io.Discard, io.Discard)
 
 	err := runKong(t, &SheetsUpdateNoteCmd{}, []string{"s1", "Sheet1!A1"}, ctx, flags)
 	if err == nil {
@@ -331,11 +246,7 @@ func TestSheetsUpdateNoteCmd_MissingNote(t *testing.T) {
 
 func TestSheetsUpdateNoteCmd_MissingSheetName(t *testing.T) {
 	flags := &RootFlags{Account: "a@b.com"}
-	u, uiErr := ui.New(ui.Options{Stdout: io.Discard, Stderr: io.Discard, Color: "never"})
-	if uiErr != nil {
-		t.Fatalf("ui.New: %v", uiErr)
-	}
-	ctx := ui.WithUI(context.Background(), u)
+	ctx := newCmdRuntimeOutputContext(t, io.Discard, io.Discard)
 
 	err := runKong(t, &SheetsUpdateNoteCmd{}, []string{"s1", "A1", "--note", "test"}, ctx, flags)
 	if err == nil {

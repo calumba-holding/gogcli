@@ -107,7 +107,7 @@ func (c *SheetsUpdateNoteCmd) Run(ctx context.Context, flags *RootFlags) error {
 	}
 
 	if outfmt.IsJSON(ctx) {
-		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
+		return outfmt.WriteJSON(ctx, stdoutWriter(ctx), map[string]any{
 			"spreadsheetId": spreadsheetID,
 			"range":         rangeSpec,
 			"cellsUpdated":  cellCount,
