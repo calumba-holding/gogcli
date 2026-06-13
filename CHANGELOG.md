@@ -19,6 +19,7 @@
 - Auth: bind renamed-account alias, client, and default-account migration to the active runtime config store.
 - Time: honor the runtime-selected `default_timezone` in `time now`, Gmail timestamps, watch output, Calendar time, and generated email Date headers instead of reading ambient config.
 - Config: bind account and calendar alias management and resolution to the active runtime config store.
+- Docs: document publishing personal External OAuth apps before authorization to avoid Google's seven-day Testing refresh-token expiry.
 
 ## 0.25.0 - 2026-06-12
 
