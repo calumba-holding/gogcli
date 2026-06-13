@@ -211,15 +211,6 @@ func WriteFileAtomic(path string, data []byte, perm os.FileMode) error {
 	return nil
 }
 
-func ConfigExists() (bool, error) {
-	store, err := defaultConfigStore()
-	if err != nil {
-		return false, err
-	}
-
-	return store.Exists()
-}
-
 func (s *ConfigStore) Exists() (bool, error) {
 	path := s.Path()
 

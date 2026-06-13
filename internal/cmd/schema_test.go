@@ -142,7 +142,11 @@ func TestExecute_SchemaResolvesAccountNoSendAliasFromEnvironment(t *testing.T) {
 	if err := config.SetAccountAlias("work", "user@example.com"); err != nil {
 		t.Fatalf("SetAccountAlias: %v", err)
 	}
-	if err := config.SetNoSendAccount("user@example.com", true); err != nil {
+	store, err := config.DefaultConfigStore()
+	if err != nil {
+		t.Fatalf("DefaultConfigStore: %v", err)
+	}
+	if err := store.SetNoSendAccount("user@example.com", true); err != nil {
 		t.Fatalf("SetNoSendAccount: %v", err)
 	}
 

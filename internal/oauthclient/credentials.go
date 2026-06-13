@@ -181,15 +181,6 @@ func (s *CredentialsStore) Delete(client string) error {
 	return nil
 }
 
-func ClientSecretInKeyring(client string) bool {
-	store, err := defaultCredentialsStore()
-	if err != nil {
-		return false
-	}
-
-	return store.ClientSecretInKeyring(client)
-}
-
 func (s *CredentialsStore) ClientSecretInKeyring(client string) bool {
 	key, err := ClientSecretKey(client)
 	if err != nil {

@@ -41,12 +41,6 @@ func loginKeychainPath() string {
 	return filepath.Join(home, "Library", "Keychains", "login.keychain-db")
 }
 
-// CheckKeychainLocked checks if the login keychain is locked.
-// Returns true if locked, false if unlocked or on error detecting status.
-func CheckKeychainLocked() bool {
-	return checkKeychainLocked(context.Background())
-}
-
 func checkKeychainLocked(ctx context.Context) bool {
 	path := loginKeychainPath()
 	if path == "" {
@@ -57,12 +51,6 @@ func checkKeychainLocked(ctx context.Context) bool {
 	err := cmd.Run()
 	// Exit code 0 = unlocked, non-zero = locked or error
 	return err != nil
-}
-
-// UnlockKeychain prompts for password and unlocks the login keychain.
-// Returns nil on success, error on failure.
-func UnlockKeychain() error {
-	return unlockKeychain(context.Background())
 }
 
 func unlockKeychain(ctx context.Context) error {

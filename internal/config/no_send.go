@@ -8,15 +8,6 @@ import (
 
 var errMissingAccount = errors.New("missing account")
 
-func SetNoSendAccount(account string, disabled bool) error {
-	store, err := defaultConfigStore()
-	if err != nil {
-		return err
-	}
-
-	return store.SetNoSendAccount(account, disabled)
-}
-
 func (s *ConfigStore) SetNoSendAccount(account string, disabled bool) error {
 	account = normalizeNoSendAccount(account)
 	if account == "" {
@@ -41,15 +32,6 @@ func (s *ConfigStore) SetNoSendAccount(account string, disabled bool) error {
 
 		return nil
 	})
-}
-
-func IsNoSendAccount(account string) (bool, error) {
-	store, err := defaultConfigStore()
-	if err != nil {
-		return false, err
-	}
-
-	return store.IsNoSendAccount(account)
 }
 
 func (s *ConfigStore) IsNoSendAccount(account string) (bool, error) {
