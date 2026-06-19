@@ -2,39 +2,16 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"io"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
 func TestSheetsFreezeCmd(t *testing.T) {
-	var gotBody map[string]any
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, "/sheets/v4"), "/v4")
-		switch {
-		case strings.HasPrefix(path, "/spreadsheets/s1") && r.Method == http.MethodGet:
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"sheets": []map[string]any{
-					{"properties": map[string]any{"sheetId": 0, "title": "Sheet1"}},
-				},
-			})
-		case strings.Contains(path, "/spreadsheets/s1:batchUpdate") && r.Method == http.MethodPost:
-			if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
-				t.Fatalf("decode body: %v", err)
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{})
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer srv.Close()
-
-	svc := newSheetsServiceFromServer(t, srv)
+	capture := &sheetsBatchUpdateCapture{}
+	svc := newSheetsBatchUpdateTestService(t, map[string]any{
+		"sheets": []map[string]any{{"properties": map[string]any{"sheetId": 0, "title": "Sheet1"}}},
+	}, capture)
 
 	flags := &RootFlags{Account: "a@b.com"}
 	ctx := withSheetsTestService(newCmdRuntimeOutputContext(t, io.Discard, io.Discard), svc)
@@ -44,9 +21,9 @@ func TestSheetsFreezeCmd(t *testing.T) {
 		t.Fatalf("freeze: %v", err)
 	}
 
-	requests, ok := gotBody["requests"].([]any)
+	requests, ok := capture.Body["requests"].([]any)
 	if !ok || len(requests) != 1 {
-		t.Fatalf("unexpected requests: %#v", gotBody)
+		t.Fatalf("unexpected requests: %#v", capture.Body)
 	}
 	update := requests[0].(map[string]any)["updateSheetProperties"].(map[string]any)
 	props := update["properties"].(map[string]any)

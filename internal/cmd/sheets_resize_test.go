@@ -2,50 +2,26 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"io"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 )
 
 func TestSheetsResizeCmds(t *testing.T) {
-	var gotBody map[string]any
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(strings.TrimPrefix(r.URL.Path, "/sheets/v4"), "/v4")
-		switch {
-		case strings.HasPrefix(path, "/spreadsheets/s1") && r.Method == http.MethodGet:
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"sheets": []map[string]any{
-					{"properties": map[string]any{"sheetId": 0, "title": "Sheet1"}},
-				},
-			})
-		case strings.Contains(path, "/spreadsheets/s1:batchUpdate") && r.Method == http.MethodPost:
-			if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
-				t.Fatalf("decode body: %v", err)
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{})
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer srv.Close()
-
-	svc := newSheetsServiceFromServer(t, srv)
+	capture := &sheetsBatchUpdateCapture{}
+	svc := newSheetsBatchUpdateTestService(t, map[string]any{
+		"sheets": []map[string]any{{"properties": map[string]any{"sheetId": 0, "title": "Sheet1"}}},
+	}, capture)
 
 	flags := &RootFlags{Account: "a@b.com"}
 	ctx := withSheetsTestService(newCmdRuntimeOutputContext(t, io.Discard, io.Discard), svc)
 
 	t.Run("resize columns force-sends zero sheet and start index", func(t *testing.T) {
-		gotBody = nil
+		capture.reset()
 		cmd := &SheetsResizeColumnsCmd{}
 		if err := runKong(t, cmd, []string{"s1", "A:C", "--width", "120"}, ctx, flags); err != nil {
 			t.Fatalf("resize-columns: %v", err)
 		}
-		requests := gotBody["requests"].([]any)
+		requests := capture.Body["requests"].([]any)
 		update := requests[0].(map[string]any)["updateDimensionProperties"].(map[string]any)
 		rng := update["range"].(map[string]any)
 		if _, ok := rng["sheetId"]; !ok {
@@ -60,12 +36,12 @@ func TestSheetsResizeCmds(t *testing.T) {
 	})
 
 	t.Run("resize rows auto", func(t *testing.T) {
-		gotBody = nil
+		capture.reset()
 		cmd := &SheetsResizeRowsCmd{}
 		if err := runKong(t, cmd, []string{"s1", "1:3", "--auto"}, ctx, flags); err != nil {
 			t.Fatalf("resize-rows: %v", err)
 		}
-		requests := gotBody["requests"].([]any)
+		requests := capture.Body["requests"].([]any)
 		auto := requests[0].(map[string]any)["autoResizeDimensions"].(map[string]any)
 		rng := auto["dimensions"].(map[string]any)
 		if _, ok := rng["sheetId"]; !ok {
