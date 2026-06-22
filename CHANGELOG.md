@@ -2,6 +2,9 @@
 
 ## 0.30.1 - Unreleased
 
+- Evals: add reproducible structural and live Codex/OpenClaw gog/gws comparisons with correctness assertions, token/tool/latency metrics, cache-counterbalanced repetitions, methodology, and CI coverage.
+- CLI: add `GOG_HELP=agent` compact root help with common read-only recipes and targeted schema guidance so agents can execute Gmail, Calendar, and Drive tasks without traversing multiple help levels.
+
 ## 0.30.0 - 2026-06-21
 
 ### Added
