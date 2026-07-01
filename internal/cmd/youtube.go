@@ -16,6 +16,29 @@ import (
 
 const youtubeForceSSLOAuthScope = "https://www.googleapis.com/auth/youtube.force-ssl"
 
+var youtubeVideoDefaultParts = []string{
+	"snippet",
+	"contentDetails",
+	"statistics",
+}
+
+// youtubeVideoAllNonOwnerParts matches every videos.list part documented as
+// readable for arbitrary videos. Owner-only parts remain available through an
+// explicit --parts list for callers querying their own uploads.
+var youtubeVideoAllNonOwnerParts = []string{
+	"contentDetails",
+	"id",
+	"liveStreamingDetails",
+	"localizations",
+	"paidProductPlacementDetails",
+	"player",
+	"recordingDetails",
+	"snippet",
+	"statistics",
+	"status",
+	"topicDetails",
+}
+
 type YouTubeCmd struct {
 	Activities    YouTubeActivitiesCmd    `cmd:"" name:"activities" aliases:"activity" help:"List channel activities"`
 	Videos        YouTubeVideosCmd        `cmd:"" name:"videos" aliases:"video" help:"List or get videos"`
@@ -72,8 +95,30 @@ type YouTubeVideosListCmd struct {
 	Chart    string `name:"chart" help:"Chart: mostPopular (regionCode required)"`
 	Region   string `name:"region" help:"Region code (e.g. US) for chart"`
 	MyRating string `name:"my-rating" help:"Your rated videos: like (liked videos) or dislike (requires -a account)"`
+	Parts    string `name:"parts" help:"Comma-separated videos.list parts or 'all' (default: snippet,contentDetails,statistics)"`
 	Max      int64  `name:"max" aliases:"limit" help:"Max results" default:"25"`
 	Page     string `name:"page" help:"Page token"`
+}
+
+func (c *YouTubeVideosListCmd) resolveParts() ([]string, error) {
+	parts := splitCSV(c.Parts)
+	if len(parts) == 0 {
+		return append([]string(nil), youtubeVideoDefaultParts...), nil
+	}
+	all := false
+	for _, part := range parts {
+		if part == literalAll {
+			all = true
+			break
+		}
+	}
+	if !all {
+		return parts, nil
+	}
+	if len(parts) != 1 {
+		return nil, usage("--parts all cannot be combined with explicit parts")
+	}
+	return append([]string(nil), youtubeVideoAllNonOwnerParts...), nil
 }
 
 func (c *YouTubeVideosListCmd) Run(ctx context.Context, flags *RootFlags) error {
@@ -110,9 +155,12 @@ func (c *YouTubeVideosListCmd) Run(ctx context.Context, flags *RootFlags) error 
 	if myRating != "" && myRating != "like" && myRating != "dislike" {
 		return usage("--my-rating must be like or dislike")
 	}
+	parts, err := c.resolveParts()
+	if err != nil {
+		return err
+	}
 
 	var svc *youtube.Service
-	var err error
 	if myRating != "" {
 		// myRating reads are per-user and require OAuth, not an API key.
 		account, accErr := requireAccount(flags)
@@ -127,7 +175,7 @@ func (c *YouTubeVideosListCmd) Run(ctx context.Context, flags *RootFlags) error 
 		return err
 	}
 
-	call := svc.Videos.List([]string{"snippet", "contentDetails", "statistics"}).
+	call := svc.Videos.List(parts).
 		MaxResults(c.Max).
 		PageToken(c.Page)
 	switch {
