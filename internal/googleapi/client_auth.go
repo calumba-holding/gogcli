@@ -35,8 +35,74 @@ type persistingTokenSource struct {
 	tok secrets.Token
 }
 
+type forceRefreshTokenSource interface {
+	ForceRefresh(context.Context) (*oauth2.Token, error)
+}
+
+var (
+	errBaseTokenSourceCannotForceRefresh = errors.New("base token source cannot force refresh")
+	errBaseTokenSourceReturnedNilToken   = errors.New("base token source returned nil token")
+)
+
+type resettableOAuthTokenSource struct {
+	mu           sync.Mutex
+	source       oauth2.TokenSource
+	newSource    func(*oauth2.Token) oauth2.TokenSource
+	refreshToken string
+}
+
 type tokenAliasDeleter interface {
 	DeleteTokenAlias(client string, email string) error
+}
+
+func newResettableOAuthTokenSource(newSource func(*oauth2.Token) oauth2.TokenSource, initial *oauth2.Token) *resettableOAuthTokenSource {
+	return &resettableOAuthTokenSource{
+		source:       newSource(initial),
+		newSource:    newSource,
+		refreshToken: strings.TrimSpace(initial.RefreshToken),
+	}
+}
+
+func (r *resettableOAuthTokenSource) Token() (*oauth2.Token, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	t, err := r.source.Token()
+	if err != nil {
+		return nil, fmt.Errorf("resettable oauth token source: %w", err)
+	}
+
+	r.rememberRefreshTokenLocked(t)
+
+	return t, nil
+}
+
+func (r *resettableOAuthTokenSource) ForceRefresh(context.Context) (*oauth2.Token, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	refreshToken := r.refreshToken
+	candidate := r.newSource(&oauth2.Token{RefreshToken: refreshToken})
+
+	t, err := candidate.Token()
+	if err != nil {
+		return nil, fmt.Errorf("resettable oauth token source refresh: %w", err)
+	}
+
+	r.source = candidate
+	r.rememberRefreshTokenLocked(t)
+
+	return t, nil
+}
+
+func (r *resettableOAuthTokenSource) rememberRefreshTokenLocked(t *oauth2.Token) {
+	if t == nil {
+		return
+	}
+
+	if refreshToken := strings.TrimSpace(t.RefreshToken); refreshToken != "" {
+		r.refreshToken = refreshToken
+	}
 }
 
 func newPersistingTokenSource(base oauth2.TokenSource, store secrets.Store, client string, email string, tok secrets.Token, serviceLabel string, updateEmailReferences googleauth.EmailReferenceUpdater) oauth2.TokenSource {
@@ -52,15 +118,42 @@ func newPersistingTokenSource(base oauth2.TokenSource, store secrets.Store, clie
 }
 
 func (p *persistingTokenSource) Token() (*oauth2.Token, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	t, err := p.base.Token()
 	if err != nil {
 		return nil, fmt.Errorf("base token source: %w", err)
 	}
 
-	refreshToken := strings.TrimSpace(t.RefreshToken)
+	return p.persistTokenLocked(t)
+}
+
+func (p *persistingTokenSource) ForceRefresh(ctx context.Context) error {
+	refresher, ok := p.base.(forceRefreshTokenSource)
+	if !ok {
+		return errBaseTokenSourceCannotForceRefresh
+	}
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	t, err := refresher.ForceRefresh(ctx)
+	if err != nil {
+		return fmt.Errorf("force token refresh: %w", err)
+	}
+
+	_, err = p.persistTokenLocked(t)
+
+	return err
+}
+
+func (p *persistingTokenSource) persistTokenLocked(t *oauth2.Token) (*oauth2.Token, error) {
+	if t == nil {
+		return nil, errBaseTokenSourceReturnedNilToken
+	}
+
+	refreshToken := strings.TrimSpace(t.RefreshToken)
 
 	updated := p.tok
 	changed := false
@@ -126,26 +219,26 @@ func (p *persistingTokenSource) Token() (*oauth2.Token, error) {
 	}
 
 	if err := p.store.SetToken(p.client, persistEmail, updated); err != nil {
-		slog.Warn("persist refreshed token metadata failed", "email", persistEmail, "client", p.client, "err", err)
+		slog.Warn("persist refreshed token metadata failed", "email", persistEmail, "client", p.client, "err", err) //nolint:gosec // logged values are token metadata identifiers for auth diagnostics
 		return t, nil
 	}
 
 	if !strings.EqualFold(p.email, persistEmail) {
 		if err := googleauth.MigrateStoredEmailReferences(p.store, p.updateEmailReferences, p.client, p.email, persistEmail); err != nil {
-			slog.Warn("migrate renamed token email references failed", "old_email", p.email, "new_email", persistEmail, "client", p.client, "err", err)
+			slog.Warn("migrate renamed token email references failed", "old_email", p.email, "new_email", persistEmail, "client", p.client, "err", err) //nolint:gosec // logged values are token metadata identifiers for auth diagnostics
 		}
 
 		aliasDeleter, ok := p.store.(tokenAliasDeleter)
 		if !ok {
-			slog.Debug("token store cannot delete renamed email alias", "old_email", p.email, "new_email", persistEmail, "client", p.client)
+			slog.Debug("token store cannot delete renamed email alias", "old_email", p.email, "new_email", persistEmail, "client", p.client) //nolint:gosec // logged values are token metadata identifiers for auth diagnostics
 		} else if err := aliasDeleter.DeleteTokenAlias(p.client, p.email); err != nil {
-			slog.Warn("delete renamed token alias failed", "old_email", p.email, "new_email", persistEmail, "client", p.client, "err", err)
+			slog.Warn("delete renamed token alias failed", "old_email", p.email, "new_email", persistEmail, "client", p.client, "err", err) //nolint:gosec // logged values are token metadata identifiers for auth diagnostics
 		}
 	}
 
 	p.tok = updated
 	p.email = persistEmail
-	slog.Debug("persisted refreshed token metadata", "email", persistEmail, "client", p.client)
+	slog.Debug("persisted refreshed token metadata", "email", persistEmail, "client", p.client) //nolint:gosec // logged values are token metadata identifiers for auth diagnostics
 
 	return t, nil
 }
@@ -276,7 +369,9 @@ func tokenSourceForAccountScopesWithStoredScopeCheck(
 	// Ensure refresh-token exchanges don't hang forever.
 	ctx = context.WithValue(ctx, oauth2.HTTPClient, &http.Client{Timeout: tokenExchangeTimeout})
 
-	baseSource := cfg.TokenSource(ctx, &oauth2.Token{
+	baseSource := newResettableOAuthTokenSource(func(t *oauth2.Token) oauth2.TokenSource {
+		return cfg.TokenSource(ctx, t)
+	}, &oauth2.Token{
 		RefreshToken: tok.RefreshToken,
 		AccessToken:  strings.TrimSpace(tok.AccessToken),
 		Expiry:       tok.AccessTokenExpiresAt,
