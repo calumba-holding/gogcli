@@ -1630,6 +1630,7 @@ update_homebrew() {
   local verifier_release_snapshot
   local darwin_amd64_sha256 darwin_arm64_sha256 linux_amd64_sha256 linux_arm64_sha256
   local formula_file formula_info installed_prefix installed_binary install_state_file
+  local tap_checkout tap_checkout_head tap_checkout_remote tap_fetch_head
   local install_state_present gog_installed native_binary_sha256
   local brew_bin brew_dir brew_home comparison comparison_status completed_tap_commit tap_run_json
   local observed_tap_commit tap_source_commit resume_tap
@@ -1841,8 +1842,49 @@ update_homebrew() {
     "$darwin_amd64_sha256" "$darwin_arm64_sha256" \
     "$linux_amd64_sha256" "$linux_arm64_sha256"
 
+  # Homebrew 6 refuses to install an arbitrary formula path. Advance its
+  # managed tap only across the already-verified one-commit transition, then
+  # require that tap formula to be byte-identical to the immutable API copy.
+  tap_checkout=$(env -i "${homebrew_env[@]}" "$brew_bin" --repository openclaw/tap)
+  [[ "$tap_checkout" == /* && -d "$tap_checkout/.git" && ! -L "$tap_checkout" ]] || {
+    echo "release: Homebrew tap checkout is missing or indirect" >&2
+    exit 1
+  }
+  tap_checkout_remote=$(trusted_git -C "$tap_checkout" remote get-url origin)
+  [[ "$tap_checkout_remote" == https://github.com/openclaw/homebrew-tap.git ||
+    "$tap_checkout_remote" == https://github.com/openclaw/homebrew-tap ]] || {
+    echo "release: Homebrew tap checkout has an untrusted origin" >&2
+    exit 1
+  }
+  [[ -z "$(trusted_git -C "$tap_checkout" status --porcelain)" ]] || {
+    echo "release: Homebrew tap checkout has local changes" >&2
+    exit 1
+  }
+  [[ "$(trusted_git -C "$tap_checkout" symbolic-ref --short HEAD)" == "$trusted_tap_branch" ]] || {
+    echo "release: Homebrew tap checkout is not on the protected branch" >&2
+    exit 1
+  }
+  tap_checkout_head=$(trusted_git -C "$tap_checkout" rev-parse HEAD)
+  if [[ "$tap_checkout_head" != "$completed_tap_commit" ]]; then
+    [[ "$tap_checkout_head" == "$tap_source_commit" ]] || {
+      echo "release: Homebrew tap checkout is not at the trusted transition base" >&2
+      exit 1
+    }
+    trusted_git -C "$tap_checkout" fetch --no-tags origin "$trusted_tap_branch"
+    tap_fetch_head=$(trusted_git -C "$tap_checkout" rev-parse FETCH_HEAD)
+    [[ "$tap_fetch_head" == "$completed_tap_commit" ]] || {
+      echo "release: fetched Homebrew tap head differs from the verified commit" >&2
+      exit 1
+    }
+    trusted_git -C "$tap_checkout" merge --ff-only "$completed_tap_commit"
+  fi
+  cmp -s "$formula_file" "$tap_checkout/Formula/gogcli.rb" || {
+    echo "release: managed Homebrew tap formula differs from the verified formula" >&2
+    exit 1
+  }
+
   formula_info="$work_dir/formula-info.json"
-  env -i "${homebrew_env[@]}" "$brew_bin" info --json=v2 "$formula_file" > "$formula_info"
+  env -i "${homebrew_env[@]}" "$brew_bin" info --json=v2 openclaw/tap/gogcli > "$formula_info"
   [[ "$(jq -r '.formulae | length' "$formula_info")" == 1 &&
     "$(jq -r '.formulae[0].name // empty' "$formula_info")" == gogcli &&
     "$(jq -r '.formulae[0].versions.stable // empty' "$formula_info")" == "$version" ]] || {
@@ -1863,7 +1905,7 @@ update_homebrew() {
     "$accepted_snapshot_hash" "$completed_tap_commit" "$native_binary_sha256"
   install_state_present=true
   if [[ "$gog_installed" == false ]]; then
-    env -i "${homebrew_env[@]}" "$brew_bin" install --formula "$formula_file"
+    env -i "${homebrew_env[@]}" "$brew_bin" install --formula openclaw/tap/gogcli
   else
     echo "release: resuming the exact recorded Homebrew install proof"
   fi

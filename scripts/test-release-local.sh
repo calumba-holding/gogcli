@@ -1256,13 +1256,18 @@ grep -Fq -- '--ref "$trusted_tap_branch"' <<<"$homebrew_function"
 grep -Fq "'.workflow_id'" <<<"$homebrew_function"
 grep -Fq "'.path'" <<<"$homebrew_function"
 grep -Fq 'contents/Formula/gogcli.rb?ref=$completed_tap_commit' <<<"$homebrew_function"
-grep -Fq 'env -i "${homebrew_env[@]}" "$brew_bin" info --json=v2' <<<"$homebrew_function"
-grep -Fq 'env -i "${homebrew_env[@]}" "$brew_bin" install --formula' <<<"$homebrew_function"
+grep -Fq 'tap_checkout=$(env -i "${homebrew_env[@]}" "$brew_bin" --repository openclaw/tap)' <<<"$homebrew_function"
+grep -Fq '[[ "$tap_checkout_head" == "$tap_source_commit" ]]' <<<"$homebrew_function"
+grep -Fq '[[ "$tap_fetch_head" == "$completed_tap_commit" ]]' <<<"$homebrew_function"
+grep -Fq 'trusted_git -C "$tap_checkout" merge --ff-only "$completed_tap_commit"' <<<"$homebrew_function"
+grep -Fq 'cmp -s "$formula_file" "$tap_checkout/Formula/gogcli.rb"' <<<"$homebrew_function"
+grep -Fq 'env -i "${homebrew_env[@]}" "$brew_bin" info --json=v2 openclaw/tap/gogcli' <<<"$homebrew_function"
+grep -Fq 'env -i "${homebrew_env[@]}" "$brew_bin" install --formula openclaw/tap/gogcli' <<<"$homebrew_function"
 grep -Fq 'env -i "${homebrew_env[@]}" "$brew_bin" test gogcli' <<<"$homebrew_function"
 grep -Fq 'cmp -s "$handoff_candidate" "$installed_binary"' <<<"$homebrew_function"
 grep -Fq '"$installed_binary" "$native_arch" "$version" static' <<<"$homebrew_function"
 grep -Fq 'assert_trusted_release_helpers_clean' <<<"$homebrew_function"
-install_line=$(grep -nF '"$brew_bin" install --formula' <<<"$homebrew_function" | cut -d: -f1)
+install_line=$(grep -nF '"$brew_bin" install --formula openclaw/tap/gogcli' <<<"$homebrew_function" | cut -d: -f1)
 installed_cmp_line=$(grep -nF 'cmp -s "$handoff_candidate" "$installed_binary"' <<<"$homebrew_function" | cut -d: -f1)
 installed_static_line=$(grep -nF '"$installed_binary" "$native_arch" "$version" static' <<<"$homebrew_function" | cut -d: -f1)
 brew_test_line=$(grep -nF '"$brew_bin" test gogcli' <<<"$homebrew_function" | cut -d: -f1)
