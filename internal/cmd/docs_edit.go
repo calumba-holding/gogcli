@@ -71,6 +71,9 @@ func (c *DocsWriteCmd) Run(ctx context.Context, kctx *kong.Context, flags *RootF
 	if tabErr != nil {
 		return tabErr
 	}
+	if tab == "" && (flagProvided(kctx, "tab") || flagProvided(kctx, "tab-id")) {
+		return usage("--tab requires a non-empty tab title or ID")
+	}
 	c.Tab = tab
 
 	if err := c.validateDocumentStyle(); err != nil {
